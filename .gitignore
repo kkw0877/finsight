@@ -4,6 +4,9 @@ out/
 next-env.d.ts
 tsconfig.tsbuildinfo
 
+# macOS
+.DS_Store
+
 # environment variables (secrets — .env.example만 커밋한다)
 .env
 .env.local
