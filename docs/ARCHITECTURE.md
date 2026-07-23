@@ -2,6 +2,7 @@
 
 ## 기술 스택
 - **Next.js 15 (App Router) + TypeScript strict**
+- **Tailwind CSS v4** — CSS-first `@theme` 토큰 정의 (`tailwind.config` 없이 `globals.css`에서 디자인 토큰을 선언). 토큰 출처는 `docs/UI_GUIDE.md` / `docs/ADR.md`(ADR-010) 참고
 - **Supabase** — Auth(Google OAuth), DB(Postgres + RLS), Storage(원본 CSV)
 - **Claude API (Anthropic SDK)** — CSV 파싱 + 인사이트 생성
 - **Polar** — 구독 결제
@@ -17,7 +18,11 @@ src/
 │       ├── upload/route.ts      # CSV 업로드 + 동기 분석
 │       ├── checkout/route.ts    # Polar 체크아웃 세션 생성
 │       └── webhooks/polar/route.ts   # 구독 상태 동기화
-├── components/                 # UI 컴포넌트 (요약 카드, 도넛차트, 추이 차트, 거래 테이블 등)
+├── components/
+│   ├── ui/                      # 디자인 시스템 프리미티브 (Button, Card, Tag, Avatar, Input, Toast, StatTile, TransactionRow, Sparkline — 출처: ADR-010)
+│   └── ...                      # 피처 컴포넌트 (도넛차트, 월별 추이 차트, 거래 테이블 등 — ui/ 프리미티브 조합)
+├── styles/
+│   └── tokens/                  # 디자인 토큰 CSS (colors/typography/spacing/radii/shadows) — docs/UI_GUIDE.md와 1:1 대응
 ├── types/                      # TypeScript 타입 정의 (거래, 분석결과, 구독 등)
 ├── lib/
 │   ├── csv.ts                   # 인코딩 감지(EUC-KR/CP949 → UTF-8) + 민감정보 마스킹 유틸
@@ -32,6 +37,8 @@ src/
 
 ## 패턴
 Server Components를 기본으로 하고, 인터랙션이 필요한 곳(업로드 위젯, 차트, 업그레이드 버튼 등)만 Client Component로 만든다. 외부 API(Claude/Polar/Supabase) 호출은 전부 Route Handler 또는 `services/` 래퍼에서만 수행하고, 클라이언트 컴포넌트는 절대 직접 호출하지 않는다.
+
+다크모드는 고정값이며 라이트모드·`prefers-color-scheme` 토글을 두지 않는다. 도넛차트·월별 추이 차트는 별도 차트 라이브러리 없이 SVG로 직접 구현한다(차트가 2종뿐이고 고급 인터랙션은 MVP 범위 밖). 폰트는 `next/font/google`로 로드한다.
 
 ## 데이터 흐름
 
