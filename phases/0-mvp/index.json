@@ -69,7 +69,10 @@
     {
       "step": 8,
       "name": "upload-api",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-07-24T16:50:04+0900",
+      "summary": "src/app/api/upload/route.ts POST 핸들러 구현 — ARCHITECTURE.md 순서(인증→quota 판정→파일크기 검증→인코딩감지→행수 검증→Storage 원본 저장→마스킹 사본 생성→Claude 파싱/분류→DB 저장 원본 그대로→AnalysisResult 응답)를 그대로 따름. 인증 실패 401, quota 소진(ADR-006)은 분석은 진행하되 응답에 blurred:true 포함, 파일크기/행수 초과는 400. Storage 경로는 서버가 {user.id}/{uploadId}.csv로 생성(원본 파일명 미사용). 에러 응답에 CSV 원문/Claude 응답 전문 미포함. TDD로 비로그인/정상저장/크기초과/행수초과/quota소진 5개 테스트 신규 작성(jsdom의 Request.formData·Blob.arrayBuffer 미구현으로 이 테스트 파일만 @vitest-environment node로 오버라이드), 전체 73개 테스트 통과. npm run build/lint/test 통과, 로컬 dev 서버 curl로 정상/비로그인(401)/크기초과(400)/행수초과(400) 흐름 실제 검증, vercel deploy 프리뷰 배포 검증(https://finsight-c70m9bgz1-vercels-projects-fe265439.vercel.app)",
+      "completed_at": "2026-07-24T17:05:00+0900"
     },
     {
       "step": 9,
