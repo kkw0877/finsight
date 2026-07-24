@@ -32,7 +32,7 @@
       "status": "completed",
       "started_at": "2026-07-24T16:24:31+0900",
       "summary": "src/lib/csv.ts에 detectAndDecode(UTF-8/EUC-KR·CP949 자동감지), maskSensitiveData(카드번호·계좌번호 마스킹, Claude 전송 사본 전용), validateFileSize(2MB), validateRowCount(2000행) 구현. src/lib/quota.ts에 FREE_MONTHLY_LIMIT=3, canUpload(isPro, uploadsThisMonth) 구현. TDD로 정상/경계값/실패 케이스 18개 테스트 작성 및 통과",
-      "completed_at": "2026-07-24T16:30:00+0900"
+      "completed_at": "2026-07-24T16:27:55+0900"
     },
     {
       "step": 4,
