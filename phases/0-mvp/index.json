@@ -16,7 +16,7 @@
       "status": "completed",
       "started_at": "2026-07-24T16:15:40+0900",
       "summary": "src/types/transaction.ts, upload.ts, analysis.ts, subscription.ts에 Category(9종)/Transaction/Upload/CategoryTotal/MonthlyTrendPoint/AnalysisResult/Subscription 순수 타입 정의",
-      "completed_at": "2026-07-24T16:16:00+0900"
+      "completed_at": "2026-07-24T16:17:21+0900"
     },
     {
       "step": 2,
