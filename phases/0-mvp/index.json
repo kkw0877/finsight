@@ -125,7 +125,9 @@
     {
       "step": 15,
       "name": "real-polar-integration",
-      "status": "pending"
+      "status": "blocked",
+      "started_at": "2026-07-24T18:16:35+0900",
+      "blocked_reason": "src/services/polar.ts를 @polar-sh/sdk 실제 호출로 교체 완료(createCheckoutSession은 checkouts.create + externalCustomerId로 userId 연결, verifyAndParseWebhook은 @polar-sh/sdk/webhooks의 validateEvent로 Standard Webhooks 서명(webhook-id/webhook-timestamp/webhook-signature)을 검증 — 시크릿 미설정 시 검증을 생략하지 않고 즉시 에러를 던짐, fail-closed). src/app/api/webhooks/polar/route.ts는 세 서명 헤더를 모아 전달하고, 서비스 롤 클라이언트(신규 src/services/supabase-admin.ts, SUPABASE_SERVICE_ROLE_KEY 전용)로 RLS를 우회해 DB에 반영하도록 수정(step 13이 남긴 과제: 웹훅은 사용자 세션이 없어 기존 쿠키 기반 클라이언트로는 RLS insert 정책을 통과할 수 없었음). 하지만 실제 .env 확인 결과 POLAR_WEBHOOK_SECRET이 비어 있고(웹훅 엔드포인트가 Polar 대시보드에 아직 등록되지 않음) POLAR_PRODUCT_ID도 설정되어 있지 않아(Pro 구독 상품이 아직 생성되지 않음) 실제 체크아웃 생성과 웹훅 서명 검증을 프로덕션에서 동작시킬 수 없다. 필요한 수동 조치: (1) Polar 대시보드에서 Pro 구독 상품을 생성해 발급되는 Product ID를 POLAR_PRODUCT_ID로 등록, (2) Polar 대시보드에서 배포된 URL(https://finsight-*.vercel.app/api/webhooks/polar)로 웹훅 엔드포인트를 등록해 발급되는 시크릿을 POLAR_WEBHOOK_SECRET으로 등록(로컬 .env와 Vercel 환경변수 모두). 두 값이 채워지기 전까지 서명 검증을 생략하는 우회 경로는 두지 않았음(CLAUDE.md CRITICAL 준수). npm run build/lint/test(114개, Polar SDK는 vi.mock으로 목킹) 통과 확인, 두 값이 채워지기 전이라 vercel deploy는 보류."
     },
     {
       "step": 16,
