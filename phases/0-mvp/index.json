@@ -1,0 +1,94 @@
+{
+  "project": "FinSight",
+  "phase": "0-mvp",
+  "steps": [
+    {
+      "step": 0,
+      "name": "project-setup",
+      "status": "completed",
+      "started_at": "2026-07-24T16:10:19+0900",
+      "summary": "Next.js 15 App Router + TS strict + Tailwind v4(@theme) + ESLint + Vitest/RTL로 src/ 레이아웃 스켈레톤을 구성하고 Vercel에 최초 배포(https://finsight-coral.vercel.app)까지 검증함"
+    },
+    {
+      "step": 1,
+      "name": "core-types",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "design-system",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "lib-utils",
+      "status": "pending"
+    },
+    {
+      "step": 4,
+      "name": "mock-supabase-client",
+      "status": "pending"
+    },
+    {
+      "step": 5,
+      "name": "mock-claude-service",
+      "status": "pending"
+    },
+    {
+      "step": 6,
+      "name": "mock-polar-service",
+      "status": "pending"
+    },
+    {
+      "step": 7,
+      "name": "auth-flow",
+      "status": "pending"
+    },
+    {
+      "step": 8,
+      "name": "upload-api",
+      "status": "pending"
+    },
+    {
+      "step": 9,
+      "name": "dashboard-ui",
+      "status": "pending"
+    },
+    {
+      "step": 10,
+      "name": "billing-flow",
+      "status": "pending"
+    },
+    {
+      "step": 11,
+      "name": "landing-page",
+      "status": "pending"
+    },
+    {
+      "step": 12,
+      "name": "supabase-schema-rls",
+      "status": "pending"
+    },
+    {
+      "step": 13,
+      "name": "real-supabase-integration",
+      "status": "pending"
+    },
+    {
+      "step": 14,
+      "name": "real-claude-integration",
+      "status": "pending"
+    },
+    {
+      "step": 15,
+      "name": "real-polar-integration",
+      "status": "pending"
+    },
+    {
+      "step": 16,
+      "name": "final-smoke-deploy",
+      "status": "pending"
+    }
+  ],
+  "created_at": "2026-07-24T16:10:19+0900"
+}
