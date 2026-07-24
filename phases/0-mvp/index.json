@@ -120,7 +120,7 @@
       "status": "completed",
       "started_at": "2026-07-24T18:04:29+0900",
       "summary": "src/services/claude.ts 내부를 @anthropic-ai/sdk 실제 호출로 교체(시그니처 유지) — parseCsvToTransactions는 claude-haiku-4-5, classifyAndSummarize는 claude-sonnet-5(claude-api 스킬로 확인한 모델 ID), 둘 다 output_config.format(json_schema)로 구조화 출력 사용. 카테고리별/월별 집계·비율은 모델이 아닌 aggregateTransactions(코드)로 계산해 정확성을 보장하고 summaryText만 모델이 생성한 값을 사용(빈 문자열이면 계산된 요약으로 폴백), 9종 고정 카테고리를 벗어난 분류는 '기타'로 방어적 폴백. Claude 응답 파싱 실패/API 실패는 원문·응답 전문 노출 없이 일반 에러만 throw. 실제 API로 CSV 샘플(10/100/500행) 지연시간 스파이크 실측 결과 100행 기준 파싱+분류 약 67초, 500행에서 max_tokens=8192로 인한 JSON 잘림 확인 → max_tokens를 16000으로 상향(그래도 2,000행 상한 근접 대용량은 여전히 잘릴 수 있음 — ADR-004에 명시된 기존 트레이드오프이며 잘림 시 일반 '분석 실패' 에러로 안전하게 처리됨)하고 upload route.ts에 maxDuration=300 설정. 기존 claude.test.ts를 vi.mock('@anthropic-ai/sdk')로 재작성(11개), upload route.test.ts도 동일하게 SDK를 목킹하도록 수정. npm run build/lint/test(108개) 통과. ANTHROPIC_API_KEY는 services/claude.ts 밖에서 참조되지 않음을 grep으로 확인, 로그/에러 메시지에 CSV 원문·프롬프트·응답 전문 미포함.",
-      "completed_at": "2026-07-24T18:20:00+0900"
+      "completed_at": "2026-07-24T18:16:35+0900"
     },
     {
       "step": 15,
