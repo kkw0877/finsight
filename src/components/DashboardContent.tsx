@@ -18,10 +18,33 @@ export interface DashboardContentProps {
 export function DashboardContent({ initialAnalysis, initialBlurred }: DashboardContentProps) {
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(initialAnalysis);
   const [blurred, setBlurred] = useState(initialBlurred);
+  const [upgrading, setUpgrading] = useState(false);
+  const [upgradeError, setUpgradeError] = useState<string | null>(null);
 
   function handleResult({ blurred: nextBlurred, ...result }: UploadResult) {
     setAnalysis(result);
     setBlurred(nextBlurred);
+  }
+
+  async function handleUpgrade() {
+    setUpgrading(true);
+    setUpgradeError(null);
+
+    try {
+      const response = await fetch("/api/checkout", { method: "POST" });
+      const body = await response.json();
+
+      if (!response.ok) {
+        setUpgradeError(body.error ?? "체크아웃 생성에 실패했습니다.");
+        return;
+      }
+
+      window.location.href = body.url;
+    } catch {
+      setUpgradeError("체크아웃 생성 중 오류가 발생했습니다.");
+    } finally {
+      setUpgrading(false);
+    }
   }
 
   const totalSpend = analysis?.categoryTotals.reduce((sum, c) => sum + c.total, 0) ?? 0;
@@ -85,7 +108,10 @@ export function DashboardContent({ initialAnalysis, initialBlurred }: DashboardC
             <div className="absolute inset-0 flex items-center justify-center">
               <Card className="flex flex-col items-center gap-3 text-center">
                 <p className="text-base text-ink">이번 달 무료 업로드 횟수를 모두 사용했습니다.</p>
-                <Button type="button">Pro로 업그레이드</Button>
+                <Button type="button" onClick={handleUpgrade} disabled={upgrading}>
+                  {upgrading ? "이동 중..." : "Pro로 업그레이드"}
+                </Button>
+                {upgradeError && <p className="text-sm text-negative">{upgradeError}</p>}
               </Card>
             </div>
           )}

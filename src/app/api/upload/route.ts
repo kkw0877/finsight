@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
   ).length;
 
   const { data: subscriptions } = await supabase.from("subscriptions").select().eq("userId", user.id);
-  const isPro = subscriptions?.[0]?.isPro ?? false;
+  const isPro = subscriptions?.at(-1)?.isPro ?? false;
   const blurred = !canUpload(isPro, uploadsThisMonth);
 
   const formData = await request.formData();

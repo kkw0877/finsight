@@ -24,7 +24,7 @@ export default async function DashboardPage() {
   const analysis = aggregateTransactions(transactions ?? []);
 
   const { data: subscriptions } = await supabase.from("subscriptions").select().eq("userId", user.id);
-  const isPro = subscriptions?.[0]?.isPro ?? false;
+  const isPro = subscriptions?.at(-1)?.isPro ?? false;
 
   const latestMonth = latestUpload.createdAt.slice(0, 7);
   const uploadsBeforeLatest = sortedUploads.filter(
