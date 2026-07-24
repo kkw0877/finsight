@@ -2,7 +2,8 @@
   "phases": [
     {
       "dir": "0-mvp",
-      "status": "pending"
+      "status": "blocked",
+      "blocked_at": "2026-07-24T17:34:24+0900"
     }
   ]
 }
