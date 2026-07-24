@@ -53,7 +53,10 @@
     {
       "step": 6,
       "name": "mock-polar-service",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-07-24T16:38:32+0900",
+      "summary": "src/services/polar.ts에 createCheckoutSession(userId): Promise<{ url }>와 verifyAndParseWebhook(payload, signature): Promise<{ userId, isPro } | null> 구현(ADR-007, step 15는 내부 구현만 실제 Polar SDK 호출로 교체, 시그니처 유지). createCheckoutSession은 고정 더미 URL(/mock-checkout?user=)만 반환하고 DB에 아무 것도 쓰지 않음(checkout_pending 미저장 원칙 준수). verifyAndParseWebhook은 서명 검증 없이 payload를 JSON 파싱해 userId(string)/isPro(boolean) 형식이 맞으면 반환, 아니면 null. TDD로 정상/잘못된 JSON/필드 누락/타입불일치 케이스 5개 테스트 작성 및 통과. npm run build/lint/test 통과, vercel deploy 프리뷰 배포 검증(https://finsight-9nvkyj0ie-vercels-projects-fe265439.vercel.app)",
+      "completed_at": "2026-07-24T16:41:00+0900"
     },
     {
       "step": 7,
