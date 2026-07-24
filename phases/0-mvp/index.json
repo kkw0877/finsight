@@ -21,7 +21,10 @@
     {
       "step": 2,
       "name": "design-system",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-07-24T16:17:22+0900",
+      "summary": "UI_GUIDE.md 색상/폰트/radii/shadow 토큰을 src/styles/tokens/*.css(@theme)로 정의하고 globals.css에서 import, next/font로 Instrument Sans + IBM Plex Mono를 root layout에 적용. src/components/ui/에 Button/Card/Tag/Avatar/Input/Toast/StatTile/TransactionRow/Sparkline 9개 프리미티브 + Vitest/RTL 테스트를 구현, lucide-react 아이콘 패키지 추가(Toast에 적용). npm run build/lint/test 통과, vercel deploy 프리뷰 배포 검증",
+      "completed_at": "2026-07-24T16:32:10+0900"
     },
     {
       "step": 3,
