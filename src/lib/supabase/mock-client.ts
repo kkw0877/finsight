@@ -142,6 +142,10 @@ export function createMockClient(): SupabaseClientLike {
         store.currentUser = null;
         return { error: null };
       },
+      async exchangeCodeForSession() {
+        store.currentUser = MOCK_USER;
+        return { error: null };
+      },
     },
     from<K extends TableName>(table: K) {
       return new MockTableQuery(table);

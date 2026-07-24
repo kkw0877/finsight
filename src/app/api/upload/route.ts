@@ -5,7 +5,7 @@ import { detectAndDecode, maskSensitiveData, validateFileSize, validateRowCount 
 import { parseCsvToTransactions, classifyAndSummarize } from "@/services/claude";
 import type { Upload } from "@/types/upload";
 
-const STATEMENTS_BUCKET = "statements";
+const STATEMENTS_BUCKET = "csv-uploads";
 
 export async function POST(request: NextRequest) {
   const supabase = await createServerClient();

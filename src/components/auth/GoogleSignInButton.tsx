@@ -7,7 +7,12 @@ export function GoogleSignInButton() {
   const router = useRouter();
 
   async function handleClick() {
-    await fetch("/api/auth/signin", { method: "POST" });
+    const response = await fetch("/api/auth/signin", { method: "POST" });
+    const data = await response.json();
+    if (data.url) {
+      window.location.href = data.url;
+      return;
+    }
     router.push("/dashboard");
   }
 

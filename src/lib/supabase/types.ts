@@ -55,6 +55,7 @@ export interface SupabaseClientLike {
       options?: { redirectTo?: string };
     }): Promise<{ data: { url: string | null } }>;
     signOut(): Promise<{ error: null }>;
+    exchangeCodeForSession(code: string): Promise<{ error: Error | null }>;
   };
   from<K extends TableName>(table: K): TableQuery<TableRowMap[K]>;
   storage: {
