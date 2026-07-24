@@ -7,7 +7,8 @@
       "name": "project-setup",
       "status": "completed",
       "started_at": "2026-07-24T16:10:19+0900",
-      "summary": "Next.js 15 App Router + TS strict + Tailwind v4(@theme) + ESLint + Vitest/RTL로 src/ 레이아웃 스켈레톤을 구성하고 Vercel에 최초 배포(https://finsight-coral.vercel.app)까지 검증함"
+      "summary": "Next.js 15 App Router + TS strict + Tailwind v4(@theme) + ESLint + Vitest/RTL로 src/ 레이아웃 스켈레톤을 구성하고 Vercel에 최초 배포(https://finsight-coral.vercel.app)까지 검증함",
+      "completed_at": "2026-07-24T16:15:40+0900"
     },
     {
       "step": 1,
