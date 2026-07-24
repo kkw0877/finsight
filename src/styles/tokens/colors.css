@@ -1,0 +1,30 @@
+/* 색상 토큰 — docs/UI_GUIDE.md "색상" 섹션과 1:1 대응. 다크모드 고정, 라이트모드 토큰 없음. */
+@theme {
+  /* 배경 */
+  --color-canvas: oklch(14% 0.005 264);
+  --color-surface: oklch(23% 0.01 264);
+  --color-surface-raised: oklch(26.5% 0.01 264);
+
+  /* 텍스트 */
+  --color-ink: oklch(97% 0 0);
+  --color-ink-muted: oklch(75% 0.012 264);
+  --color-ink-subtle: oklch(58% 0.01 264);
+  --color-ink-disabled: oklch(40% 0.008 264);
+
+  /* 데이터/시맨틱 */
+  --color-positive: oklch(47% 0.12 162);
+  --color-negative: oklch(52% 0.16 25);
+  --color-warning: oklch(72% 0.14 45);
+  --color-neutral: oklch(58% 0.008 264);
+
+  /* 포인트 컬러 (Primary / 앰버) */
+  --color-primary: oklch(77% 0.165 70);
+  --color-primary-hover: oklch(71% 0.165 70);
+  --color-primary-active: oklch(67% 0.155 70);
+  --color-primary-focus: oklch(74% 0.16 70);
+  --color-primary-tint: oklch(95% 0.025 70);
+  --color-on-primary: oklch(14% 0.005 264);
+
+  /* 보더 */
+  --color-hairline: oklch(32% 0.01 264);
+}

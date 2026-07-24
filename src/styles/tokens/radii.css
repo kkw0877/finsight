@@ -1,0 +1,5 @@
+/* 반경 토큰 — docs/UI_GUIDE.md / ADR-010: none/sm/md/lg/pill.
+   none/sm/md/lg는 Tailwind 기본 스케일을 그대로 사용한다. pill(버튼 전용, 999px)만 커스텀 추가. */
+@theme {
+  --radius-pill: 999px;
+}

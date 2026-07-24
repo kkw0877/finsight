@@ -1,0 +1,8 @@
+/* 타이포그래피 토큰 — docs/UI_GUIDE.md "타이포그래피" 섹션.
+   font-sans는 Instrument Sans(UI/본문), font-mono는 IBM Plex Mono(금액·날짜 등 모든 수치).
+   실제 폰트 로드는 next/font/google로 root layout(src/app/layout.tsx)에서 수행하고,
+   여기서는 next/font가 주입하는 CSS 변수를 Tailwind 기본 폰트 토큰에 연결한다. */
+@theme {
+  --font-sans: var(--font-instrument-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-ibm-plex-mono), ui-monospace, SFMono-Regular, monospace;
+}

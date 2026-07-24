@@ -1,0 +1,5 @@
+/* 그림자 토큰 — 카드/버튼/테이블은 shadow 금지(docs/UI_GUIDE.md "카드" 섹션).
+   팝오버/드롭다운/토스트(bg-surface-raised) 같은 부유 요소의 elevation에만 한정해서 사용한다. */
+@theme {
+  --shadow-toast: 0 4px 16px oklch(0% 0 0 / 0.4);
+}

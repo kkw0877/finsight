@@ -1,5 +1,17 @@
 import type { Metadata } from "next";
+import { Instrument_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
+
+const instrumentSans = Instrument_Sans({
+  subsets: ["latin"],
+  variable: "--font-instrument-sans",
+});
+
+const ibmPlexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-ibm-plex-mono",
+});
 
 export const metadata: Metadata = {
   title: "FinSight",
@@ -12,10 +24,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko" className="dark">
-      <body className="bg-neutral-950 text-neutral-100 antialiased">
-        {children}
-      </body>
+    <html
+      lang="ko"
+      className={`dark ${instrumentSans.variable} ${ibmPlexMono.variable}`}
+    >
+      <body className="bg-canvas text-ink antialiased">{children}</body>
     </html>
   );
 }
