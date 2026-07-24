@@ -96,7 +96,7 @@
       "status": "completed",
       "started_at": "2026-07-24T17:14:01+0900",
       "summary": "src/app/(marketing)/page.tsx에 마케팅 랜딩 페이지 구현(ADR-003: 가치 설명 + 로그인 유도, 업로드는 대시보드 전용 유지) — 기존 스켈레톤 src/app/page.tsx를 대체. 좌측 정렬 헤드라인+본문(max-w-[680px]) + step 7의 GoogleSignInButton CTA, 4개 핵심 기능 요약(CSV 업로드/자동 카테고리 분류/지출 비중/월별 추이)을 lucide 아이콘(strokeWidth 1.5, 배경 박스 없음) + Card 프리미티브로 그리드 배치. 후기/FAQ/데모 GIF, 그라데이션 히어로, backdrop-blur, gradient-text, box-shadow 글로우, 중앙 정렬, Instrument Serif 모두 미사용(UI_GUIDE AI 슬롭 안티패턴 준수). TDD로 헤드라인/CTA/기능 요약 렌더링 3개 신규 테스트 작성, 전체 100개 테스트 통과. npm run build/lint/test 통과, vercel deploy 프리뷰 배포 검증(https://finsight-rhh4ee8li-vercels-projects-fe265439.vercel.app)",
-      "completed_at": "2026-07-24T17:22:00+0900"
+      "completed_at": "2026-07-24T17:17:21+0900"
     },
     {
       "step": 12,
