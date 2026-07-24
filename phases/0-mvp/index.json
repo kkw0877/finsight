@@ -101,7 +101,9 @@
     {
       "step": 12,
       "name": "supabase-schema-rls",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-07-24T17:17:21+0900",
+      "summary": "supabase/migrations/20260724000000_init_schema.sql 작성(적용은 step 13에서 수행) — uploads(id/user_id/storage_path/status/row_count/created_at), transactions(id/upload_id/user_id/date/merchant/amount/category 9종 check/memo/created_at, upload_id FK on delete cascade), subscriptions(user_id PK/is_pro/updated_at) 3개 테이블 생성. 세 테이블 모두 RLS 활성화 + user_id = auth.uid() 기반 select/insert 정책만 부여(전체허용 정책 없음). Storage csv-uploads 버킷 생성 + storage.objects에 (storage.foldername(name))[1] = auth.uid()::text 조건으로 본인 폴더만 select/insert 허용하는 정책 추가. user_id/upload_id에 조회 성능용 인덱스 추가. Supabase CLI 미설치로 supabase db lint 대신 SQL 수동 리뷰(괄호 균형·정책 문법)로 검증. npm run build/lint/test(100개) 통과."
     },
     {
       "step": 13,
