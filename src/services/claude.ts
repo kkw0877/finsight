@@ -1,129 +1,203 @@
+import Anthropic from "@anthropic-ai/sdk";
 import type { Category, Transaction } from "@/types/transaction";
-import type { AnalysisResult, CategoryTotal, MonthlyTrendPoint } from "@/types/analysis";
+import type { AnalysisResult } from "@/types/analysis";
+import { aggregateTransactions } from "@/lib/aggregate";
 
 /**
- * Mock-First (step 5): 실제 Claude 호출 없이 흐름 검증용 규칙 기반 구현.
- * step 14에서 이 두 함수의 내부 구현만 실제 Anthropic SDK 호출로 교체한다 — 시그니처는 유지.
+ * ADR-004 2단계 호출: ①CSV→거래JSON 파싱(Haiku 4.5) → ②거래JSON→분류·요약(Sonnet 5).
+ * ANTHROPIC_API_KEY는 이 파일 밖에서 참조하지 않는다 — SDK가 환경변수에서 직접 읽는다.
  */
+const PARSE_MODEL = "claude-haiku-4-5";
+const CLASSIFY_MODEL = "claude-sonnet-5";
 
-const DATE_RE = /^\d{4}[-./]\d{2}[-./]\d{2}$/;
-const AMOUNT_RE = /^-?\d{1,3}(,\d{3})*$|^-?\d+$/;
-const HEADER_KEYWORDS = /날짜|date|가맹점|상호|적요|금액|amount/i;
+const CATEGORIES: Category[] = [
+  "식비",
+  "교통",
+  "주거_공과금",
+  "쇼핑",
+  "의료_건강",
+  "구독서비스",
+  "여가_문화",
+  "저축_투자",
+  "기타",
+];
 
-function normalizeDate(raw: string): string {
-  return raw.replace(/[./]/g, "-");
-}
+const client = new Anthropic();
 
-function parseAmount(raw: string): number {
-  return Number(raw.replace(/,/g, ""));
-}
+const PARSE_SCHEMA = {
+  type: "object",
+  properties: {
+    transactions: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          date: { type: "string", description: "YYYY-MM-DD 형식으로 정규화한 거래일자" },
+          merchant: { type: "string", description: "가맹점명" },
+          amount: { type: "number", description: "거래금액(원), 정수" },
+        },
+        required: ["date", "merchant", "amount"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["transactions"],
+  additionalProperties: false,
+} as const;
 
-interface ParsedRow {
+const CLASSIFY_SCHEMA = {
+  type: "object",
+  properties: {
+    classifications: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          category: { type: "string", enum: CATEGORIES },
+        },
+        required: ["id", "category"],
+        additionalProperties: false,
+      },
+    },
+    summaryText: { type: "string", description: "이번 달 지출 패턴에 대한 한두 문장 자연어 요약" },
+  },
+  required: ["classifications", "summaryText"],
+  additionalProperties: false,
+} as const;
+
+interface ParsedTransactionRow {
   date: string;
   merchant: string;
   amount: number;
 }
 
-function parseRow(line: string): ParsedRow {
-  const cols = line.split(",").map((c) => c.trim());
-  const dateCol = cols.find((c) => DATE_RE.test(c));
-  const amountCol = [...cols].reverse().find((c) => c !== dateCol && AMOUNT_RE.test(c));
-  const merchantCol = cols.find((c) => c !== dateCol && c !== amountCol && c.length > 0);
+interface ClassificationEntry {
+  id: string;
+  category: string;
+}
 
-  if (!dateCol || !amountCol || !merchantCol) {
-    throw new Error(`CSV 행을 파싱할 수 없습니다: "${line}"`);
+/** 응답 본문/프롬프트 전문은 절대 로그·에러 메시지에 남기지 않는다 (CLAUDE.md CRITICAL). */
+function extractJsonText(message: Anthropic.Message): string {
+  const block = message.content.find((b): b is Anthropic.TextBlock => b.type === "text");
+  if (!block) {
+    throw new Error("Claude 응답 형식이 올바르지 않습니다.");
   }
-
-  return { date: normalizeDate(dateCol), merchant: merchantCol, amount: parseAmount(amountCol) };
+  return block.text;
 }
 
 /**
- * CSV 원문 → 정규화된 거래 JSON (실제로는 Claude Haiku 4.5 담당, ADR-004 1단계).
- * mock 구현은 줄 단위 + 쉼표 분리로 날짜/가맹점/금액 컬럼을 추정한다 — 카드사별 정교한 파싱은 하지 않는다.
+ * CSV 원문(마스킹된 사본) → 정규화된 거래 JSON (Claude Haiku 4.5, ADR-004 1단계).
+ * 호출부(upload API)가 이미 maskSensitiveData로 마스킹한 사본을 전달하므로 여기서는 그대로 전송한다.
  */
 export async function parseCsvToTransactions(
   csvText: string,
   uploadId: string,
   userId: string,
 ): Promise<Transaction[]> {
-  const lines = csvText.split(/\r?\n/).filter((line) => line.trim().length > 0);
-  if (lines.length === 0) {
+  if (csvText.trim().length === 0) {
     throw new Error("빈 CSV는 파싱할 수 없습니다.");
   }
 
-  const dataLines = HEADER_KEYWORDS.test(lines[0]) ? lines.slice(1) : lines;
-  if (dataLines.length === 0) {
-    throw new Error("헤더 외에 파싱할 거래 데이터가 없습니다.");
+  let message: Anthropic.Message;
+  try {
+    message = await client.messages.create({
+      model: PARSE_MODEL,
+      max_tokens: 16000,
+      output_config: { format: { type: "json_schema", schema: PARSE_SCHEMA } },
+      system:
+        "너는 한국 카드사/은행 명세서 CSV를 정규화된 거래 내역으로 변환하는 파서다. " +
+        "헤더 행이 있으면 건너뛰고, 각 데이터 행에서 날짜(YYYY-MM-DD로 정규화)/가맹점명/금액(원 단위 정수, 부호 없이 절대값)을 추출한다. " +
+        "취소·환불 행은 스킵한다. 파싱 가능한 거래가 하나도 없으면 transactions를 빈 배열로 반환한다.",
+      messages: [{ role: "user", content: csvText }],
+    });
+  } catch {
+    throw new Error("CSV 분석에 실패했습니다.");
   }
 
-  return dataLines.map((line) => {
-    const { date, merchant, amount } = parseRow(line);
-    return {
-      id: crypto.randomUUID(),
-      uploadId,
-      userId,
-      date,
-      merchant,
-      amount,
-      category: "기타" as Category,
-    };
-  });
-}
+  let parsed: { transactions: ParsedTransactionRow[] };
+  try {
+    parsed = JSON.parse(extractJsonText(message)) as { transactions: ParsedTransactionRow[] };
+  } catch {
+    throw new Error("CSV 분석에 실패했습니다.");
+  }
 
-const CATEGORY_KEYWORDS: [RegExp, Category][] = [
-  [/스타벅스|편의점|식당|배달|카페|음식|맥도날드|커피/i, "식비"],
-  [/지하철|버스|택시|주유|교통|kakao\s*t|톨게이트/i, "교통"],
-  [/전기|가스|수도|관리비|통신|아파트|월세/i, "주거_공과금"],
-  [/쿠팡|마켓|백화점|올리브영|의류|쇼핑|이마트/i, "쇼핑"],
-  [/병원|약국|의원|한의원|치과/i, "의료_건강"],
-  [/넷플릭스|유튜브|멜론|구독|왓챠|스포티파이/i, "구독서비스"],
-  [/영화|공연|여행|호텔|골프|서점/i, "여가_문화"],
-  [/증권|펀드|적금|예금|투자/i, "저축_투자"],
-];
+  if (!Array.isArray(parsed.transactions) || parsed.transactions.length === 0) {
+    throw new Error("CSV에서 거래 내역을 찾을 수 없습니다.");
+  }
 
-function categorize(merchant: string): Category {
-  const matched = CATEGORY_KEYWORDS.find(([re]) => re.test(merchant));
-  return matched ? matched[1] : "기타";
-}
-
-function monthOf(date: string): string {
-  return date.slice(0, 7);
+  return parsed.transactions.map((row) => ({
+    id: crypto.randomUUID(),
+    uploadId,
+    userId,
+    date: row.date,
+    merchant: row.merchant,
+    amount: row.amount,
+    category: "기타" as Category,
+  }));
 }
 
 /**
- * 거래 JSON → 카테고리 분류 + 요약 인사이트 (실제로는 Claude Sonnet 5/Opus 4.8 담당, ADR-004 2단계).
- * mock 구현은 가맹점명 키워드 매칭으로 9종 고정 카테고리를 배정한다.
+ * 거래 JSON → 카테고리 분류(9종 고정) + 자연어 요약 (Claude Sonnet 5, ADR-004 2단계).
+ * 카테고리별/월별 집계·비율은 모델이 아닌 코드(aggregateTransactions)로 계산해 정확성을 보장하고,
+ * summaryText만 모델이 생성한 값을 사용한다.
  */
 export async function classifyAndSummarize(transactions: Transaction[]): Promise<AnalysisResult> {
-  const categorized = transactions.map((t) => ({ ...t, category: categorize(t.merchant) }));
-
-  const totalSpend = categorized.reduce((sum, t) => sum + t.amount, 0);
-
-  const totalsByCategory = new Map<Category, number>();
-  for (const t of categorized) {
-    totalsByCategory.set(t.category, (totalsByCategory.get(t.category) ?? 0) + t.amount);
+  if (transactions.length === 0) {
+    return aggregateTransactions([]);
   }
-  const categoryTotals: CategoryTotal[] = [...totalsByCategory.entries()]
-    .map(([category, total]) => ({
-      category,
-      total,
-      percentage: totalSpend === 0 ? 0 : Math.round((total / totalSpend) * 1000) / 10,
-    }))
-    .sort((a, b) => b.total - a.total);
 
-  const totalsByMonth = new Map<string, number>();
-  for (const t of categorized) {
-    const month = monthOf(t.date);
-    totalsByMonth.set(month, (totalsByMonth.get(month) ?? 0) + t.amount);
+  let message: Anthropic.Message;
+  try {
+    message = await client.messages.create({
+      model: CLASSIFY_MODEL,
+      max_tokens: 16000,
+      output_config: { format: { type: "json_schema", schema: CLASSIFY_SCHEMA } },
+      system:
+        `너는 개인 지출 내역을 분석하는 애널리스트다. 각 거래를 가맹점명을 참고해 다음 9개 고정 카테고리 중 ` +
+        `정확히 하나로 분류한다: ${CATEGORIES.join(", ")}. 애매한 경우 '기타'로 분류한다. ` +
+        "분류가 끝나면 전체 지출 패턴(가장 많이 쓴 카테고리, 특징적인 소비 등)을 한두 문장의 자연스러운 한국어로 요약한다.",
+      messages: [
+        {
+          role: "user",
+          content: JSON.stringify(
+            transactions.map((t) => ({ id: t.id, date: t.date, merchant: t.merchant, amount: t.amount })),
+          ),
+        },
+      ],
+    });
+  } catch {
+    throw new Error("거래 분류에 실패했습니다.");
   }
-  const monthlyTrend: MonthlyTrendPoint[] = [...totalsByMonth.entries()]
-    .map(([month, total]) => ({ month, total }))
-    .sort((a, b) => a.month.localeCompare(b.month));
 
-  const top = categoryTotals[0];
-  const summaryText = top
-    ? `이번 달 ${top.category} ${top.total.toLocaleString("ko-KR")}원(전체의 ${top.percentage}%)을 지출했습니다.`
-    : "분석할 거래 내역이 없습니다.";
+  let parsed: { classifications: ClassificationEntry[]; summaryText: string };
+  try {
+    parsed = JSON.parse(extractJsonText(message)) as {
+      classifications: ClassificationEntry[];
+      summaryText: string;
+    };
+  } catch {
+    throw new Error("거래 분류에 실패했습니다.");
+  }
 
-  return { summaryText, categoryTotals, monthlyTrend, transactions: categorized };
+  const categoryById = new Map(parsed.classifications.map((c) => [c.id, c.category]));
+  const categorized: Transaction[] = transactions.map((t) => {
+    const category = categoryById.get(t.id);
+    return {
+      ...t,
+      category: isValidCategory(category) ? category : "기타",
+    };
+  });
+
+  const aggregated = aggregateTransactions(categorized);
+  const summaryText =
+    typeof parsed.summaryText === "string" && parsed.summaryText.trim().length > 0
+      ? parsed.summaryText
+      : aggregated.summaryText;
+
+  return { ...aggregated, summaryText };
+}
+
+function isValidCategory(value: string | undefined): value is Category {
+  return typeof value === "string" && (CATEGORIES as string[]).includes(value);
 }

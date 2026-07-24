@@ -7,6 +7,13 @@ import type { Upload } from "@/types/upload";
 
 const STATEMENTS_BUCKET = "csv-uploads";
 
+/**
+ * 실측(step 14 스파이크): 10행 파싱+분류 ~15초, 100행 ~67초 — 분류(Sonnet) 호출이 행 수에 비례해
+ * 가장 크게 늘어난다. 일반적인 개인 카드 명세서(수십~수백 행) 기준으로 여유를 두고 300초로 설정한다.
+ * 2,000행 상한에 근접한 대용량 CSV는 이 한도 내에서도 타임아웃될 수 있다(ADR-004에 명시된 트레이드오프).
+ */
+export const maxDuration = 300;
+
 export async function POST(request: NextRequest) {
   const supabase = await createServerClient();
   const {

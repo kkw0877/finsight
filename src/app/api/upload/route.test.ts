@@ -1,14 +1,46 @@
 // @vitest-environment node
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach, vi } from "vitest";
 import { createServerClient } from "@/lib/supabase/server";
 import { FREE_MONTHLY_LIMIT } from "@/lib/quota";
-import { POST } from "./route";
 import type { NextRequest } from "next/server";
 
 const VALID_CSV = `날짜,가맹점,금액
 2026-07-01,스타벅스 강남점,4500
 2026-07-02,GS25 편의점,3200
 `;
+
+interface MockCreateParams {
+  model: string;
+  messages: { content: string }[];
+}
+
+function textResponse(json: unknown) {
+  return { content: [{ type: "text", text: JSON.stringify(json) }] };
+}
+
+// route.ts는 services/claude.ts를 통해 실제 Anthropic API를 호출한다(step 14).
+// 이 라우팅/저장 통합 테스트는 네트워크 호출 없이 결정적으로 동작해야 하므로 SDK를 목킹한다.
+const mockCreate = vi.fn(async (params: MockCreateParams) => {
+  if (params.model === "claude-haiku-4-5") {
+    return textResponse({
+      transactions: [
+        { date: "2026-07-01", merchant: "스타벅스 강남점", amount: 4500 },
+        { date: "2026-07-02", merchant: "GS25 편의점", amount: 3200 },
+      ],
+    });
+  }
+  const transactions = JSON.parse(params.messages[0].content) as { id: string }[];
+  return textResponse({
+    classifications: transactions.map((t) => ({ id: t.id, category: "식비" })),
+    summaryText: "이번 달 지출 요약입니다.",
+  });
+});
+
+vi.mock("@anthropic-ai/sdk", () => ({
+  default: vi.fn().mockImplementation(() => ({ messages: { create: mockCreate } })),
+}));
+
+const { POST } = await import("./route");
 
 // jsdom의 Request.formData()는 멀티파트 바디 파싱을 지원하지 않아 실제 Request 대신
 // formData()만 구현한 최소 스텁으로 대체한다.
