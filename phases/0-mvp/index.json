@@ -77,7 +77,10 @@
     {
       "step": 9,
       "name": "dashboard-ui",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-07-24T16:56:46+0900",
+      "summary": "src/app/dashboard/page.tsx(Server Component)가 mock Supabase에서 최근 업로드/거래를 조회해 src/lib/aggregate.ts(aggregateTransactions)로 카테고리별/월별 집계를 조회 시점에 계산하고 quota 기반 blurred 여부를 판정. src/components/DashboardContent.tsx(Client Component)가 상태(analysis/blurred)를 들고 StatTile 요약카드 + src/components/DonutChart.tsx(SVG 도넛, dataviz 스킬로 검증한 8색 카테고리 팔레트 — 앰버 제외, 기타는 중립 회색) + src/components/MonthlyTrendChart.tsx(SVG 바 차트, 단일 시리즈라 앰버 사용) + TransactionRow 테이블을 렌더링. src/components/UploadWidget.tsx(Client Component)가 파일선택→POST /api/upload→로딩 스피너→onResult로 부모 상태 갱신을 로컬 useState로만 처리. blurred:true 응답 시 결과 영역 blur-sm 처리 + 'Pro로 업그레이드' CTA 노출(체크아웃 미연결, step 10 예정). TDD로 aggregate/DonutChart/MonthlyTrendChart/UploadWidget/DashboardContent/DashboardPage 19개 테스트 신규 작성, 전체 92개 테스트 통과. npm run build/lint/test 통과, 로컬 dev 서버 curl로 업로드→대시보드 반영 및 quota 소진 시 blur+CTA 노출 실제 검증, vercel deploy 프리뷰 배포 검증(https://finsight-gk5gbxlle-vercels-projects-fe265439.vercel.app)",
+      "completed_at": "2026-07-24T17:10:00+0900"
     },
     {
       "step": 10,
