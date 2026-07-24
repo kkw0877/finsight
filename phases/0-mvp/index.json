@@ -37,7 +37,10 @@
     {
       "step": 4,
       "name": "mock-supabase-client",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-07-24T16:27:55+0900",
+      "summary": "src/lib/supabase/types.ts에 SupabaseClientLike(auth.getUser/signInWithOAuth/signOut, from<uploads|transactions|subscriptions>, storage.from(bucket).upload/download) 최소 인터페이스 정의. TableQuery는 select/insert/eq/single + PromiseLike(then)만 지원(범용 쿼리 빌더 아님) — insert()는 기본 data:null, insert().select()로 삽입된 행을 반환(실제 supabase-js와 동일 계약, step 13 교체 대비). src/lib/supabase/mock-client.ts에 모듈 스코프 인메모리 저장소(store: uploads/transactions/subscriptions 배열 + storageObjects Map)와 고정 mock 유저(mock-user-1) 구현, server.ts/client.ts는 이를 감싸는 얇은 createServerClient/createBrowserClient 래퍼. 삽입/조회/필터/storage 업로드-다운로드 왕복 검증 테스트 12개 작성 및 통과. npm run build/lint/test 통과, vercel deploy 프리뷰 배포 검증(https://finsight-8iy2wp155-vercels-projects-fe265439.vercel.app)",
+      "completed_at": "2026-07-24T16:34:00+0900"
     },
     {
       "step": 5,
