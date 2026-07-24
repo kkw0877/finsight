@@ -45,7 +45,10 @@
     {
       "step": 5,
       "name": "mock-claude-service",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-07-24T16:34:59+0900",
+      "summary": "src/services/claude.ts에 parseCsvToTransactions(csvText, uploadId, userId)와 classifyAndSummarize(transactions) 구현 — ADR-004 2단계 호출 구조를 두 함수로 분리(step 14는 내부 구현만 실제 Anthropic SDK 호출로 교체, 시그니처 유지). parseCsvToTransactions는 줄 단위+쉼표 분리로 날짜(YYYY-MM-DD 등)/금액(숫자)/가맹점(나머지 텍스트) 컬럼을 정규식 매칭으로 추정하고 헤더 행을 감지해 스킵하며, 빈 입력·파싱 불가 행에는 에러를 throw. classifyAndSummarize는 가맹점명 키워드 매칭으로 PRD 9종 고정 카테고리(식비/교통/주거_공과금/쇼핑/의료_건강/구독서비스/여가_문화/저축_투자/기타)를 배정하고 CategoryTotal[]·MonthlyTrendPoint[]·자연어 요약 문자열을 계산. TDD로 정상/헤더없음/빈입력/파싱불가/카테고리분류/집계/요약 케이스 11개 테스트 작성 및 통과. npm run build/lint/test 통과, vercel deploy 프리뷰 배포 검증(https://finsight-o4qtm8m0k-vercels-projects-fe265439.vercel.app)",
+      "completed_at": "2026-07-24T16:37:20+0900"
     },
     {
       "step": 6,
