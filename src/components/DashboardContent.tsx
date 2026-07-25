@@ -9,6 +9,7 @@ import { DonutChart } from "@/components/DonutChart";
 import { MonthlyTrendChart } from "@/components/MonthlyTrendChart";
 import { UploadWidget, type UploadResult } from "@/components/UploadWidget";
 import type { AnalysisResult } from "@/types/analysis";
+import { FREE_MONTHLY_LIMIT } from "@/lib/quota";
 
 export interface DashboardContentProps {
   initialAnalysis: AnalysisResult | null;
@@ -69,15 +70,18 @@ export function DashboardContent({ initialAnalysis, initialBlurred }: DashboardC
       ) : (
         <div className="relative">
           <div className={blurred ? "pointer-events-none select-none blur-sm" : undefined}>
-            <div className="grid grid-cols-2 gap-4">
+            <Card>
+              <p className="text-sm font-medium text-ink-subtle">이번 달 요약</p>
+              <p className="mt-2 text-base leading-[1.6] font-medium text-ink">{analysis.summaryText}</p>
+            </Card>
+
+            <div className="mt-6 grid grid-cols-2 gap-4">
               <StatTile label="총 지출" value={`${totalSpend.toLocaleString("ko-KR")}원`} />
               <StatTile
                 label="최다 지출 카테고리"
                 value={topCategory ? `${topCategory.category} ${topCategory.percentage}%` : "-"}
               />
             </div>
-
-            <p className="mt-6 text-base leading-[1.6] text-ink-muted">{analysis.summaryText}</p>
 
             <div className="mt-8 grid gap-6 md:grid-cols-2">
               <Card>
@@ -105,9 +109,14 @@ export function DashboardContent({ initialAnalysis, initialBlurred }: DashboardC
           </div>
 
           {blurred && (
-            <div className="absolute inset-0 flex items-center justify-center">
+            <div className="absolute inset-0 flex items-center justify-center px-6">
               <Card className="flex flex-col items-center gap-3 text-center">
-                <p className="text-base text-ink">이번 달 무료 업로드 횟수를 모두 사용했습니다.</p>
+                <p className="text-base text-ink">
+                  이번 달 무료 업로드 {FREE_MONTHLY_LIMIT}회를 모두 사용했어요.
+                </p>
+                <p className="text-sm leading-[1.6] text-ink-muted">
+                  Pro로 업그레이드하면 무제한 업로드와 히스토리 보관을 이용할 수 있어요.
+                </p>
                 <Button type="button" onClick={handleUpgrade} disabled={upgrading}>
                   {upgrading ? "이동 중..." : "Pro로 업그레이드"}
                 </Button>

@@ -17,14 +17,14 @@ export function TransactionRow({ transaction, className }: TransactionRowProps) 
 
   return (
     <div className={classes}>
-      <div className="flex items-center gap-4">
-        <span className="font-mono text-[15px] leading-[1.4] font-medium text-ink-subtle tabular-nums">
+      <div className="flex min-w-0 items-center gap-4">
+        <span className="shrink-0 font-mono text-[15px] leading-[1.4] font-medium text-ink-subtle tabular-nums">
           {date}
         </span>
-        <span className="text-base text-ink">{merchant}</span>
-        <Tag>{category}</Tag>
+        <span className="truncate text-base text-ink">{merchant}</span>
+        <Tag className="shrink-0">{category}</Tag>
       </div>
-      <span className="font-mono text-[15px] leading-[1.4] font-medium text-ink tabular-nums">
+      <span className="shrink-0 font-mono text-[15px] leading-[1.4] font-medium text-ink tabular-nums">
         {amount.toLocaleString("ko-KR")}
       </span>
     </div>
