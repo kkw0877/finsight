@@ -19,3 +19,6 @@ phases/**/step*-output.json
 
 # Supabase CLI local state
 supabase/.temp/
+
+# stray worktree copies left by review agents
+.claude/worktrees/
