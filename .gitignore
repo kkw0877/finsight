@@ -16,3 +16,6 @@ tsconfig.tsbuildinfo
 phases/**/phase*-output.json
 phases/**/step*-output.json
 .vercel
+
+# Supabase CLI local state
+supabase/.temp/
