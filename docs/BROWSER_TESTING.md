@@ -2,6 +2,16 @@
 
 `dev-browser` CLI(https://github.com/sawyerhood/dev-browser)로 실행하는 수동/반자동 브라우저 테스트 시나리오 모음이다. `npm run test`(Vitest)가 커버하지 못하는 "실제 브라우저에서 렌더링·리다이렉트·네트워크가 기대대로 동작하는가"를 확인하는 용도이며, 새 기능을 추가하거나 배포 전 골든 패스를 재확인할 때 이 문서의 시나리오를 그대로 실행한다.
 
+## 빠른 실행 (권장)
+
+아래 7개 시나리오는 `scripts/browser-test.devbrowser.js`에 assertion과 함께 코드화되어 있고, `scripts/browser-test.sh`가 포트 점유 확인 → (필요시) dev 서버 기동 → 시나리오 실행 → (자신이 띄운 경우만) 서버 정리까지 한 번에 처리한다. `browser-test` 스킬을 통해 호출하거나, 직접 실행한다:
+
+```bash
+bash scripts/browser-test.sh
+```
+
+전체 시나리오를 한 번에 pass/fail로 확인할 때는 이 스크립트를 쓰고, 특정 시나리오 하나만 디버깅하거나 새 시나리오를 설계할 때는 아래 개별 스크립트를 참고한다. **시나리오를 추가/수정하면 이 문서와 `scripts/browser-test.devbrowser.js`를 함께 갱신한다.**
+
 ## 사전 준비
 
 ```bash
