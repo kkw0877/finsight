@@ -63,6 +63,7 @@ describe("POST /api/webhooks/polar", () => {
 
     const supabase = createServiceRoleClient();
     const { data } = await supabase.from("subscriptions").select().eq("userId", "webhook-user-2");
+    expect(data).toHaveLength(1);
     expect(data?.at(-1)?.isPro).toBe(false);
   });
 

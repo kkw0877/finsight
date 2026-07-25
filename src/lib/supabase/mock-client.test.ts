@@ -118,6 +118,28 @@ describe("createMockClient table queries", () => {
     expect(missing.data).toBeNull();
     expect(missing.error).toBeInstanceOf(Error);
   });
+
+  it("upsert() replaces the row matched by onConflict instead of duplicating it", async () => {
+    const client = createMockClient();
+    await client.from("subscriptions").upsert({ userId: "sub-user-1", isPro: true }, { onConflict: "userId" });
+    await client.from("subscriptions").upsert({ userId: "sub-user-1", isPro: false }, { onConflict: "userId" });
+
+    const { data, error } = await client.from("subscriptions").select().eq("userId", "sub-user-1");
+    expect(error).toBeNull();
+    expect(data).toHaveLength(1);
+    expect(data?.[0]?.isPro).toBe(false);
+  });
+
+  it("upsert() inserts a new row when no existing row matches onConflict", async () => {
+    const client = createMockClient();
+    const { data, error } = await client
+      .from("subscriptions")
+      .upsert({ userId: "sub-user-2", isPro: true }, { onConflict: "userId" })
+      .select();
+
+    expect(error).toBeNull();
+    expect(data).toEqual([{ userId: "sub-user-2", isPro: true }]);
+  });
 });
 
 describe("createMockClient storage", () => {

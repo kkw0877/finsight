@@ -44,15 +44,16 @@ async function toBuffer(file: Buffer | Blob): Promise<Buffer> {
 }
 
 class MockTableQuery<K extends TableName> implements TableQuery<TableRowMap[K]> {
-  private mode: "select" | "insert" = "select";
+  private mode: "select" | "insert" | "upsert" = "select";
   private insertRows: TableRowMap[K][] = [];
+  private onConflictColumn?: string;
   private returnInsertedRows = false;
   private filters: [string, unknown][] = [];
 
   constructor(private readonly table: K) {}
 
   select(): TableQuery<TableRowMap[K]> {
-    if (this.mode === "insert") {
+    if (this.mode === "insert" || this.mode === "upsert") {
       this.returnInsertedRows = true;
     } else {
       this.mode = "select";
@@ -63,6 +64,16 @@ class MockTableQuery<K extends TableName> implements TableQuery<TableRowMap[K]> 
   insert(rows: TableRowMap[K] | TableRowMap[K][]): TableQuery<TableRowMap[K]> {
     this.mode = "insert";
     this.insertRows = Array.isArray(rows) ? rows : [rows];
+    return this;
+  }
+
+  upsert(
+    rows: TableRowMap[K] | TableRowMap[K][],
+    options: { onConflict: keyof TableRowMap[K] & string },
+  ): TableQuery<TableRowMap[K]> {
+    this.mode = "upsert";
+    this.insertRows = Array.isArray(rows) ? rows : [rows];
+    this.onConflictColumn = options.onConflict;
     return this;
   }
 
@@ -92,6 +103,22 @@ class MockTableQuery<K extends TableName> implements TableQuery<TableRowMap[K]> 
 
     if (this.mode === "insert") {
       rows.push(...this.insertRows);
+      return { data: this.returnInsertedRows ? this.insertRows : null, error: null };
+    }
+
+    if (this.mode === "upsert") {
+      const column = this.onConflictColumn;
+      for (const row of this.insertRows) {
+        const idx = column
+          ? rows.findIndex(
+              (existing) =>
+                (existing as unknown as Record<string, unknown>)[column] ===
+                (row as unknown as Record<string, unknown>)[column],
+            )
+          : -1;
+        if (idx >= 0) rows[idx] = row;
+        else rows.push(row);
+      }
       return { data: this.returnInsertedRows ? this.insertRows : null, error: null };
     }
 

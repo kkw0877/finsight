@@ -42,6 +42,7 @@ interface PostgrestBuilder
   extends PromiseLike<{ data: Record<string, unknown>[] | null; error: { message: string } | null }> {
   select(columns?: string): PostgrestBuilder;
   insert(rows: unknown): PostgrestBuilder;
+  upsert(rows: unknown, options: { onConflict: string }): PostgrestBuilder;
   eq(column: string, value: unknown): PostgrestBuilder;
   single(): Promise<{ data: Record<string, unknown> | null; error: { message: string } | null }>;
 }
@@ -58,6 +59,16 @@ class RealTableQuery<K extends TableName> implements TableQuery<TableRowMap[K]> 
       ? rows.map((row) => toSnakeRow(row as unknown as Record<string, unknown>))
       : toSnakeRow(rows as unknown as Record<string, unknown>);
     return new RealTableQuery(this.builder.insert(payload));
+  }
+
+  upsert(
+    rows: TableRowMap[K] | TableRowMap[K][],
+    options: { onConflict: keyof TableRowMap[K] & string },
+  ): TableQuery<TableRowMap[K]> {
+    const payload = Array.isArray(rows)
+      ? rows.map((row) => toSnakeRow(row as unknown as Record<string, unknown>))
+      : toSnakeRow(rows as unknown as Record<string, unknown>);
+    return new RealTableQuery(this.builder.upsert(payload, { onConflict: camelToSnake(options.onConflict) }));
   }
 
   eq(column: keyof TableRowMap[K] & string, value: unknown): TableQuery<TableRowMap[K]> {

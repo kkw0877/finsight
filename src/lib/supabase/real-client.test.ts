@@ -7,7 +7,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * DB 컬럼은 snake_case, 어댑터가 camelCase로 왕복 변환하는지 검증한다.
  */
 function createFakeBuilder(rows: Record<string, unknown>[]) {
-  const state: { mode: "select" | "insert"; inserted: Record<string, unknown>[]; filters: [string, unknown][] } = {
+  const state: {
+    mode: "select" | "insert" | "upsert";
+    inserted: Record<string, unknown>[];
+    onConflict?: string;
+    filters: [string, unknown][];
+  } = {
     mode: "select",
     inserted: [],
     filters: [],
@@ -20,6 +25,14 @@ function createFakeBuilder(rows: Record<string, unknown>[]) {
       state.inserted = Array.isArray(payload) ? payload : [payload];
       return builder;
     }),
+    upsert: vi.fn(
+      (payload: Record<string, unknown> | Record<string, unknown>[], options?: { onConflict?: string }) => {
+        state.mode = "upsert";
+        state.inserted = Array.isArray(payload) ? payload : [payload];
+        state.onConflict = options?.onConflict;
+        return builder;
+      },
+    ),
     eq: vi.fn((column: string, value: unknown) => {
       state.filters.push([column, value]);
       return builder;
@@ -37,6 +50,15 @@ function createFakeBuilder(rows: Record<string, unknown>[]) {
   async function execute() {
     if (state.mode === "insert") {
       rows.push(...state.inserted);
+      return { data: state.inserted, error: null };
+    }
+    if (state.mode === "upsert") {
+      const column = state.onConflict;
+      for (const row of state.inserted) {
+        const idx = column ? rows.findIndex((r) => r[column] === row[column]) : -1;
+        if (idx >= 0) rows[idx] = row;
+        else rows.push(row);
+      }
       return { data: state.inserted, error: null };
     }
     const matched = rows.filter((row) => state.filters.every(([col, val]) => row[col] === val));
@@ -78,6 +100,16 @@ describe("createRealClient", () => {
     await client.from("subscriptions").insert({ userId: "user-1", isPro: true });
 
     expect(rows).toEqual([{ user_id: "user-1", is_pro: true }]);
+  });
+
+  it("upsert converts payload and onConflict column to snake_case, replacing the matched row", async () => {
+    const rows: Record<string, unknown>[] = [];
+    const client = createRealClient(createFakeSupabaseClient({ tableRows: rows }));
+
+    await client.from("subscriptions").upsert({ userId: "user-1", isPro: true }, { onConflict: "userId" });
+    await client.from("subscriptions").upsert({ userId: "user-1", isPro: false }, { onConflict: "userId" });
+
+    expect(rows).toEqual([{ user_id: "user-1", is_pro: false }]);
   });
 
   it("converts snake_case select results back to camelCase", async () => {
