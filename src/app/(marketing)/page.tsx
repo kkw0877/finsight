@@ -1,31 +1,8 @@
-import { Upload, Tag, PieChart, TrendingUp } from "lucide-react";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
-import { Card } from "@/components/ui/Card";
-
-const features = [
-  {
-    icon: Upload,
-    title: "CSV 업로드",
-    description:
-      "카드사·은행에서 내려받은 명세서 CSV를 그대로 올리면 됩니다. 인코딩이나 양식은 신경 쓰지 않아도 됩니다.",
-  },
-  {
-    icon: Tag,
-    title: "자동 카테고리 분류",
-    description:
-      "거래 내역을 식비·교통·쇼핑 등 9개 카테고리로 자동 분류해 정리합니다.",
-  },
-  {
-    icon: PieChart,
-    title: "지출 비중 한눈에",
-    description: "이번 달 어디에 얼마를 썼는지 카테고리별 비중으로 확인하세요.",
-  },
-  {
-    icon: TrendingUp,
-    title: "월별 추이 파악",
-    description: "월별 지출 추이를 비교해 소비 패턴 변화를 파악할 수 있습니다.",
-  },
-];
+import { Reveal } from "@/components/landing/Reveal";
+import { DashboardMockup } from "@/components/landing/DashboardMockup";
+import { ProcessingPipeline } from "@/components/landing/ProcessingPipeline";
+import { CategoryIconGrid } from "@/components/landing/CategoryIconGrid";
 
 export default function LandingPage() {
   return (
@@ -41,22 +18,25 @@ export default function LandingPage() {
         <GoogleSignInButton />
       </section>
 
-      <section className="mt-16 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {features.map(({ icon: Icon, title, description }) => (
-          <Card key={title}>
-            <Icon
-              aria-hidden="true"
-              strokeWidth={1.5}
-              className="h-6 w-6 text-primary"
-            />
-            <h2 className="mt-4 text-sm font-medium text-ink-subtle">
-              {title}
-            </h2>
-            <p className="mt-2 text-base leading-[1.6] text-ink-muted">
-              {description}
-            </p>
-          </Card>
-        ))}
+      <div className="mt-16 space-y-16">
+        <Reveal>
+          <DashboardMockup />
+        </Reveal>
+
+        <Reveal>
+          <ProcessingPipeline />
+        </Reveal>
+
+        <Reveal>
+          <CategoryIconGrid />
+        </Reveal>
+      </div>
+
+      <section className="mt-16 max-w-[680px] space-y-6">
+        <p className="text-base leading-[1.6] text-ink-muted">
+          지금 바로 카드 명세서를 올려 이번 달 소비 패턴을 확인해보세요.
+        </p>
+        <GoogleSignInButton />
       </section>
     </main>
   );

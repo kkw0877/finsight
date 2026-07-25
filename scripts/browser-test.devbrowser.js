@@ -22,14 +22,19 @@ function record(name, pass, details) {
   const page = await browser.getPage("finsight");
   await page.goto("http://localhost:3000", { waitUntil: "domcontentloaded" });
   const h1 = await page.locator("h1").textContent();
-  const ctaVisible = await page.getByRole("button", { name: "Google로 로그인" }).isVisible();
-  const cardTitles = await page.locator("h2").allTextContents();
-  const expectedCards = ["CSV 업로드", "자동 카테고리 분류", "지출 비중 한눈에", "월별 추이 파악"];
+  const ctaButtons = await page.getByRole("button", { name: "Google로 로그인" }).all();
+  const ctaCount = ctaButtons.length;
+  const sectionTitles = await page.locator("h2").allTextContents();
+  const expectedSections = [
+    "카드 명세서 하나면, 이런 화면을 받습니다",
+    "이렇게 분석합니다",
+    "9가지 카테고리로 자동 분류됩니다",
+  ];
   const pass =
     h1 === "카드 명세서를 올리면, 소비 패턴을 정리해드립니다" &&
-    ctaVisible === true &&
-    arraysEqual(cardTitles, expectedCards);
-  record("1. 랜딩 페이지 요소 검증", pass, { h1, ctaVisible, cardTitles });
+    ctaCount === 2 &&
+    arraysEqual(sectionTitles, expectedSections);
+  record("1. 랜딩 페이지 요소 검증", pass, { h1, ctaCount, sectionTitles });
 }
 
 // 2. 모바일 반응형 (375px)

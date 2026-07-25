@@ -103,6 +103,12 @@ rounded-sm bg-surface border border-hairline px-4 py-3 text-ink placeholder:text
 - 값 변경(잔액 갱신 등): 200ms crossfade — 슬라이드·바운스 금지
 - 그 외 모든 애니메이션(스프링, 페이지 전환 코레오그래피 등) 금지
 
+### 랜딩 전용 확장
+아래 두 종류만 랜딩 페이지(`app/(marketing)`) 한정으로 기존 예산에 추가한다. 다른 화면(대시보드 등)에는 적용하지 않는다.
+- **스크롤 등장(reveal)**: 뷰포트에 처음 들어올 때 `opacity 0→1` + `translate-y 8px→0`, 200–300ms ease-out, 1회성(재진입 시 재실행 없음). `prefers-reduced-motion: reduce`에서는 Tailwind `motion-reduce:` 변형으로 전환 없이 항상 최종 상태로 렌더링한다.
+- **숫자 카운트업**: 강조 수치가 뷰포트에 들어올 때 시작값에서 목표값까지 최대 800ms 동안 증가한다. `font-mono tabular-nums`는 유지하고, 애니메이션 유무와 무관하게 최종 문자열은 항상 동일해야 한다. reduced motion에서는 즉시 목표값을 표시한다.
+- 여전히 금지: 스프링/바운스 이징, 자동재생 루프, hover 반복 애니메이션, 스크롤 위치 결합 패럴랙스, 여러 섹션이 순차 코레오그래피처럼 이어지는 연출.
+
 ## 아이콘
 - Lucide 아이콘 사용 (실제 브랜드 아이콘 자산이 없어 임시로 채택 — 자산 확보 시 교체)
 - strokeWidth 1.5, 채움(fill) 없음

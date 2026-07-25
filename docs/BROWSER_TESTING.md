@@ -43,8 +43,8 @@ curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3000   # 200 확인
 ## 시나리오
 
 ### 1. 랜딩 페이지 요소 검증
-**목적**: 헤드라인, CTA 버튼, 4개 기능 카드가 모두 렌더링되는지 확인.
-**기대 결과**: `h1`이 랜딩 헤드라인과 일치, CTA 버튼("Google로 로그인") visible, `cardTitles`가 `["CSV 업로드", "자동 카테고리 분류", "지출 비중 한눈에", "월별 추이 파악"]`.
+**목적**: 헤드라인, CTA 버튼(히어로+최하단 2개), 신규 인사이트 섹션 3개(대시보드 목업/AI 처리 과정 인포그래픽/카테고리 아이콘 그리드)가 모두 렌더링되는지 확인.
+**기대 결과**: `h1`이 랜딩 헤드라인과 일치, CTA 버튼("Google로 로그인")이 2개, `sectionTitles`가 `["카드 명세서 하나면, 이런 화면을 받습니다", "이렇게 분석합니다", "9가지 카테고리로 자동 분류됩니다"]`.
 
 ```bash
 dev-browser --headless <<'EOF'
@@ -52,10 +52,10 @@ const page = await browser.getPage("finsight");
 await page.goto("http://localhost:3000", { waitUntil: "domcontentloaded" });
 
 const h1 = await page.locator("h1").textContent();
-const ctaVisible = await page.getByRole("button", { name: "Google로 로그인" }).isVisible();
-const cardTitles = await page.locator("h2").allTextContents();
+const ctaCount = (await page.getByRole("button", { name: "Google로 로그인" }).all()).length;
+const sectionTitles = await page.locator("h2").allTextContents();
 
-console.log(JSON.stringify({ h1, ctaVisible, cardTitles }, null, 2));
+console.log(JSON.stringify({ h1, ctaCount, sectionTitles }, null, 2));
 EOF
 ```
 
