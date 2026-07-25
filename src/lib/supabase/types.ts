@@ -25,6 +25,7 @@ export interface SingleQueryResult<T> {
 export interface TableQuery<T> extends PromiseLike<QueryResult<T>> {
   select(columns?: string): TableQuery<T>;
   insert(rows: T | T[]): TableQuery<T>;
+  upsert(rows: T | T[], options: { onConflict: keyof T & string }): TableQuery<T>;
   eq(column: keyof T & string, value: unknown): TableQuery<T>;
   single(): Promise<SingleQueryResult<T>>;
 }

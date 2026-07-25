@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
 
   const supabase = createServiceRoleClient();
   const subscription: Subscription = { userId: result.userId, isPro: result.isPro };
-  await supabase.from("subscriptions").insert(subscription);
+  await supabase.from("subscriptions").upsert(subscription, { onConflict: "userId" });
 
   return NextResponse.json({ ok: true });
 }
