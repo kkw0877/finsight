@@ -1,7 +1,7 @@
 # 프로젝트: FinSight
 
 카드 명세서 CSV를 업로드하면 Claude가 파싱·분류하고 지출 요약 인사이트를 제공하는 핀테크 SaaS.
-상세 배경은 `docs/PRD.md`, `docs/ARCHITECTURE.md`, `docs/ADR.md`, `docs/UI_GUIDE.md` 참고.
+상세 배경은 `docs/PRD.md`, `docs/ARCHITECTURE.md`, `docs/ADR.md`, `docs/UI_GUIDE.md`, `docs/UX_GUIDE.md` 참고. 브라우저 테스트 시나리오는 `docs/BROWSER_TESTING.md` 참고.
 
 ## 기술 스택
 - Next.js 15 (App Router)
