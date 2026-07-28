@@ -51,7 +51,7 @@ describe("LandingPage", () => {
     expect(
       screen.getByRole("heading", { name: "이렇게 분석합니다" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("CSV 업로드")).toBeInTheDocument();
+    expect(screen.getByText("CSV/PDF 업로드")).toBeInTheDocument();
     expect(screen.getByText(/Haiku/)).toBeInTheDocument();
     expect(screen.getByText(/Sonnet/)).toBeInTheDocument();
     expect(screen.getByText("인사이트 완성")).toBeInTheDocument();

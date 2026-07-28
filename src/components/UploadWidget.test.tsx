@@ -18,7 +18,9 @@ describe("UploadWidget", () => {
 
   it("항상 인코딩·용량 제한 안내 문구를 보여준다", () => {
     render(<UploadWidget onResult={vi.fn()} />);
-    expect(screen.getByText("EUC-KR/CP949 자동 인식 · 최대 2MB · 2,000행까지")).toBeInTheDocument();
+    expect(
+      screen.getByText("CSV·PDF 지원 · EUC-KR/CP949 자동 인식 · 최대 2MB(CSV)/5MB(PDF) · 2,000행까지"),
+    ).toBeInTheDocument();
   });
 
   it("분석 중에는 단계별 진행 라벨을 순서대로 보여준다", async () => {
@@ -32,10 +34,10 @@ describe("UploadWidget", () => {
     ) as unknown as typeof fetch;
 
     render(<UploadWidget onResult={vi.fn()} />);
-    selectFile(screen.getByLabelText("CSV 파일 선택"));
+    selectFile(screen.getByLabelText("CSV 또는 PDF 파일 선택"));
     fireEvent.click(screen.getByRole("button", { name: "업로드" }));
 
-    expect(screen.getByText("CSV 읽는 중")).toBeInTheDocument();
+    expect(screen.getByText("파일 읽는 중")).toBeInTheDocument();
 
     await act(async () => {
       vi.advanceTimersByTime(3000);
@@ -78,7 +80,7 @@ describe("UploadWidget", () => {
     const onResult = vi.fn();
     render(<UploadWidget onResult={onResult} />);
 
-    selectFile(screen.getByLabelText("CSV 파일 선택"));
+    selectFile(screen.getByLabelText("CSV 또는 PDF 파일 선택"));
     fireEvent.click(screen.getByRole("button", { name: "업로드" }));
 
     await waitFor(() => expect(onResult).toHaveBeenCalledWith(mockResult));
@@ -97,7 +99,7 @@ describe("UploadWidget", () => {
     }) as unknown as typeof fetch;
 
     render(<UploadWidget onResult={vi.fn()} />);
-    selectFile(screen.getByLabelText("CSV 파일 선택"));
+    selectFile(screen.getByLabelText("CSV 또는 PDF 파일 선택"));
     fireEvent.click(screen.getByRole("button", { name: "업로드" }));
 
     await waitFor(() => expect(screen.getByText("분석에 실패했습니다.")).toBeInTheDocument());

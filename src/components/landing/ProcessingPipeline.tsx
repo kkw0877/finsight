@@ -4,13 +4,13 @@ import { Card } from "@/components/ui/Card";
 const STEPS = [
   {
     icon: Upload,
-    title: "CSV 업로드",
-    description: "카드사 명세서 CSV를 그대로 올립니다.",
+    title: "CSV/PDF 업로드",
+    description: "카드사 명세서를 CSV나 PDF 그대로 올립니다.",
   },
   {
     icon: ScanText,
     title: "Haiku가 거래 인식",
-    description: "CSV를 정규화된 거래 내역으로 변환합니다.",
+    description: "명세서를 정규화된 거래 내역으로 변환합니다.",
   },
   {
     icon: Brain,

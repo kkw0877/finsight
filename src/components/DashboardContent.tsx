@@ -58,7 +58,7 @@ export function DashboardContent({ initialAnalysis, initialBlurred }: DashboardC
           대시보드
         </h1>
         <p className="mt-2 text-base leading-[1.6] text-ink-muted">
-          카드 명세서 CSV를 업로드하면 지출을 분석해드립니다.
+          카드 명세서(CSV 또는 PDF)를 업로드하면 지출을 분석해드립니다.
         </p>
         <div className="mt-6">
           <UploadWidget onResult={handleResult} />

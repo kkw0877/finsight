@@ -4,7 +4,7 @@ import type { AnalysisResult } from "@/types/analysis";
 import { aggregateTransactions } from "@/lib/aggregate";
 
 /**
- * ADR-004 2단계 호출: ①CSV→거래JSON 파싱(Haiku 4.5) → ②거래JSON→분류·요약(Sonnet 5).
+ * ADR-004 2단계 호출: ①명세서→거래JSON 파싱(Haiku 4.5) → ②거래JSON→분류·요약(Sonnet 5).
  * ANTHROPIC_API_KEY는 이 파일 밖에서 참조하지 않는다 — SDK가 환경변수에서 직접 읽는다.
  */
 const PARSE_MODEL = "claude-haiku-4-5";
@@ -87,16 +87,17 @@ function extractJsonText(message: Anthropic.Message): string {
 }
 
 /**
- * CSV 원문(마스킹된 사본) → 정규화된 거래 JSON (Claude Haiku 4.5, ADR-004 1단계).
+ * 명세서 텍스트(마스킹된 사본) → 정규화된 거래 JSON (Claude Haiku 4.5, ADR-004 1단계).
+ * CSV 원문 또는 PDF에서 추출한 텍스트 모두 이 함수로 처리한다.
  * 호출부(upload API)가 이미 maskSensitiveData로 마스킹한 사본을 전달하므로 여기서는 그대로 전송한다.
  */
-export async function parseCsvToTransactions(
-  csvText: string,
+export async function parseStatementToTransactions(
+  statementText: string,
   uploadId: string,
   userId: string,
 ): Promise<Transaction[]> {
-  if (csvText.trim().length === 0) {
-    throw new Error("빈 CSV는 파싱할 수 없습니다.");
+  if (statementText.trim().length === 0) {
+    throw new Error("빈 명세서는 파싱할 수 없습니다.");
   }
 
   let message: Anthropic.Message;
@@ -106,24 +107,25 @@ export async function parseCsvToTransactions(
       max_tokens: 16000,
       output_config: { format: { type: "json_schema", schema: PARSE_SCHEMA } },
       system:
-        "너는 한국 카드사/은행 명세서 CSV를 정규화된 거래 내역으로 변환하는 파서다. " +
-        "헤더 행이 있으면 건너뛰고, 각 데이터 행에서 날짜(YYYY-MM-DD로 정규화)/가맹점명/금액(원 단위 정수, 부호 없이 절대값)을 추출한다. " +
+        "너는 한국 카드사/은행 명세서(CSV 원문 또는 PDF에서 추출한 텍스트)를 정규화된 거래 내역으로 변환하는 파서다. " +
+        "입력은 쉼표로 구분된 CSV 행일 수도 있고, PDF에서 추출되어 줄바꿈·공백이 불규칙한 표 형태 텍스트일 수도 있다. " +
+        "헤더 행이 있으면 건너뛰고, 각 거래에서 날짜(YYYY-MM-DD로 정규화)/가맹점명/금액(원 단위 정수, 부호 없이 절대값)을 추출한다. " +
         "취소·환불 행은 스킵한다. 파싱 가능한 거래가 하나도 없으면 transactions를 빈 배열로 반환한다.",
-      messages: [{ role: "user", content: csvText }],
+      messages: [{ role: "user", content: statementText }],
     });
   } catch {
-    throw new Error("CSV 분석에 실패했습니다.");
+    throw new Error("명세서 분석에 실패했습니다.");
   }
 
   let parsed: { transactions: ParsedTransactionRow[] };
   try {
     parsed = JSON.parse(extractJsonText(message)) as { transactions: ParsedTransactionRow[] };
   } catch {
-    throw new Error("CSV 분석에 실패했습니다.");
+    throw new Error("명세서 분석에 실패했습니다.");
   }
 
   if (!Array.isArray(parsed.transactions) || parsed.transactions.length === 0) {
-    throw new Error("CSV에서 거래 내역을 찾을 수 없습니다.");
+    throw new Error("명세서에서 거래 내역을 찾을 수 없습니다.");
   }
 
   return parsed.transactions.map((row) => ({

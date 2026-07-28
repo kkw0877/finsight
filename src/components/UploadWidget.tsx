@@ -14,7 +14,7 @@ export interface UploadWidgetProps {
 }
 
 const STAGE_LABELS = {
-  reading: "CSV 읽는 중",
+  reading: "파일 읽는 중",
   parsing: "거래 내역 인식 중",
   classifying: "카테고리 분류·요약 작성 중",
 } as const;
@@ -77,8 +77,8 @@ export function UploadWidget({ onResult }: UploadWidgetProps) {
       <div className="flex items-center gap-3">
         <input
           type="file"
-          accept=".csv"
-          aria-label="CSV 파일 선택"
+          accept=".csv,.pdf"
+          aria-label="CSV 또는 PDF 파일 선택"
           onChange={(event) => setFile(event.target.files?.[0] ?? null)}
           disabled={submitting}
           className="text-sm text-ink-muted file:mr-4 file:rounded-pill file:border-0 file:bg-surface-raised file:px-4 file:py-2 file:text-sm file:text-ink"
@@ -95,7 +95,7 @@ export function UploadWidget({ onResult }: UploadWidgetProps) {
         </Button>
       </div>
       <p className="text-xs leading-[1.4] text-ink-subtle">
-        EUC-KR/CP949 자동 인식 · 최대 2MB · 2,000행까지
+        CSV·PDF 지원 · EUC-KR/CP949 자동 인식 · 최대 2MB(CSV)/5MB(PDF) · 2,000행까지
       </p>
       {error && <p className="text-sm text-negative">{error}</p>}
     </form>

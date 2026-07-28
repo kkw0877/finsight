@@ -2,9 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   detectAndDecode,
   maskSensitiveData,
+  resolveStatementFormat,
   validateFileSize,
   validateRowCount,
-} from "./csv";
+} from "./statement";
 
 const SAMPLE_KOREAN_CSV =
   "거래일자,가맹점,금액\n2026-07-01,스타벅스 강남점,4500\n2026-07-02,쿠팡,15000\n";
@@ -59,17 +60,30 @@ describe("maskSensitiveData", () => {
 
 describe("validateFileSize", () => {
   const TWO_MB = 2 * 1024 * 1024;
+  const FIVE_MB = 5 * 1024 * 1024;
 
-  it("passes for sizes under the limit", () => {
-    expect(() => validateFileSize(1024)).not.toThrow();
+  it("passes CSV sizes under the 2MB limit", () => {
+    expect(() => validateFileSize(1024, "csv")).not.toThrow();
   });
 
-  it("passes for the exact boundary (2MB)", () => {
-    expect(() => validateFileSize(TWO_MB)).not.toThrow();
+  it("passes the exact CSV boundary (2MB)", () => {
+    expect(() => validateFileSize(TWO_MB, "csv")).not.toThrow();
   });
 
-  it("throws for sizes over the limit", () => {
-    expect(() => validateFileSize(TWO_MB + 1)).toThrow();
+  it("throws for CSV sizes over the 2MB limit", () => {
+    expect(() => validateFileSize(TWO_MB + 1, "csv")).toThrow();
+  });
+
+  it("passes PDF sizes under the 5MB limit", () => {
+    expect(() => validateFileSize(TWO_MB + 1, "pdf")).not.toThrow();
+  });
+
+  it("passes the exact PDF boundary (5MB)", () => {
+    expect(() => validateFileSize(FIVE_MB, "pdf")).not.toThrow();
+  });
+
+  it("throws for PDF sizes over the 5MB limit", () => {
+    expect(() => validateFileSize(FIVE_MB + 1, "pdf")).toThrow();
   });
 });
 
@@ -87,5 +101,29 @@ describe("validateRowCount", () => {
 
   it("throws for row counts over the limit", () => {
     expect(() => validateRowCount(buildCsv(2001))).toThrow();
+  });
+});
+
+describe("resolveStatementFormat", () => {
+  it("resolves .csv filenames as csv", () => {
+    expect(resolveStatementFormat("statement.csv", "text/csv")).toBe("csv");
+  });
+
+  it("resolves .pdf filenames as pdf", () => {
+    expect(resolveStatementFormat("statement.pdf", "application/pdf")).toBe("pdf");
+  });
+
+  it("is case-insensitive on the extension", () => {
+    expect(resolveStatementFormat("STATEMENT.CSV", "")).toBe("csv");
+    expect(resolveStatementFormat("STATEMENT.PDF", "")).toBe("pdf");
+  });
+
+  it("falls back to MIME type when the extension is missing", () => {
+    expect(resolveStatementFormat("statement", "text/csv")).toBe("csv");
+    expect(resolveStatementFormat("statement", "application/pdf")).toBe("pdf");
+  });
+
+  it("throws for unsupported formats", () => {
+    expect(() => resolveStatementFormat("statement.xlsx", "application/vnd.ms-excel")).toThrow();
   });
 });

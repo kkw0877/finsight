@@ -12,7 +12,7 @@ describe("ProcessingPipeline", () => {
 
   it("renders the four pipeline steps matching ADR-004's two-stage Claude call", () => {
     render(<ProcessingPipeline />);
-    expect(screen.getByText("CSV 업로드")).toBeInTheDocument();
+    expect(screen.getByText("CSV/PDF 업로드")).toBeInTheDocument();
     expect(screen.getByText(/Haiku/)).toBeInTheDocument();
     expect(screen.getByText(/Sonnet/)).toBeInTheDocument();
     expect(screen.getByText(/Opus/)).toBeInTheDocument();

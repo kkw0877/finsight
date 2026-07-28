@@ -1,6 +1,6 @@
 # 프로젝트: FinSight
 
-카드 명세서 CSV를 업로드하면 Claude가 파싱·분류하고 지출 요약 인사이트를 제공하는 핀테크 SaaS.
+카드 명세서(CSV 또는 PDF)를 업로드하면 Claude가 파싱·분류하고 지출 요약 인사이트를 제공하는 핀테크 SaaS.
 상세 배경은 `docs/PRD.md`, `docs/ARCHITECTURE.md`, `docs/ADR.md`, `docs/UI_GUIDE.md`, `docs/UX_GUIDE.md` 참고. 브라우저 테스트 시나리오는 `docs/BROWSER_TESTING.md` 참고.
 
 ## 기술 스택
@@ -14,13 +14,13 @@
 
 ## 아키텍처 규칙
 - CRITICAL: 모든 외부 API 호출(Claude, Polar, Supabase 관리자 기능)은 app/api/ 라우트 핸들러 또는 services/ 에서만 수행. 클라이언트 컴포넌트에서 직접 호출 금지.
-- CRITICAL: 카드 명세서는 민감 금융 데이터다. Supabase RLS(+ Storage 버킷 정책)로 사용자별 격리하고, Claude로 보내는 사본에는 카드번호·계좌번호 등 마스킹을 적용한다(DB 원본은 원문 보관). 저장 암호화는 Supabase 기본 at-rest에 의존한다(MVP는 별도 컬럼 암호화 없음).
+- CRITICAL: 카드 명세서는 민감 금융 데이터다. Supabase RLS(+ Storage 버킷 정책)로 사용자별 격리하고, Claude로 보내는 사본에는 카드번호·계좌번호 등 마스킹을 적용한다(DB 원본은 원문 보관). PDF는 서버에서 텍스트를 추출해 마스킹한 뒤 그 텍스트만 Claude로 보낸다 — PDF 원본 바이너리는 Claude로 전송하지 않는다. 저장 암호화는 Supabase 기본 at-rest에 의존한다(MVP는 별도 컬럼 암호화 없음).
 - CRITICAL: 시크릿(Anthropic/Polar/Supabase service-role 키)은 `services/` 래퍼를 통해 서버에서만 접근한다. `NEXT_PUBLIC_` 접두사가 없는 환경변수는 클라이언트 번들에 절대 포함하지 않는다.
-- CRITICAL: CSV 원문, Claude 프롬프트/응답 전문, API 키를 서버 로그·에러 메시지에 남기지 않는다.
+- CRITICAL: CSV/PDF 원문(및 PDF에서 추출한 텍스트), Claude 프롬프트/응답 전문, API 키를 서버 로그·에러 메시지에 남기지 않는다.
 - CRITICAL: Free/Pro 분기는 is_pro 불리언 하나로 판단. quota 판정·블러 페이월 로직은 서버에서 강제(클라이언트 신뢰 금지).
 - Server Components 기본, 인터랙션이 필요한 곳만 Client Component.
-- 컴포넌트는 components/, 타입은 types/, 외부 API 래퍼는 services/, 그 외 유틸(인코딩 감지·마스킹, quota 판정, Supabase 클라이언트 등)은 lib/ 로 분리.
-- Storage 파일 경로는 서버가 `{user_id}/{upload.id}.csv` 형태로 생성한다. 사용자가 업로드한 원본 파일명을 경로에 사용하지 않는다.
+- 컴포넌트는 components/, 타입은 types/, 외부 API 래퍼는 services/, 그 외 유틸(인코딩 감지·마스킹, PDF 텍스트 추출, quota 판정, Supabase 클라이언트 등)은 lib/ 로 분리.
+- Storage 파일 경로는 서버가 `{user_id}/{upload.id}.csv` 또는 `{user_id}/{upload.id}.pdf` 형태로 생성한다(원본 포맷 유지). 사용자가 업로드한 원본 파일명을 경로에 사용하지 않는다.
 - 색상은 무채색 베이스 + 앰버 포인트(#f59e0b). 보라/인디고 등 AI 슬롭 금지(docs/UI_GUIDE.md).
 
 ## 개발 프로세스

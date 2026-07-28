@@ -12,7 +12,7 @@ export default function LandingPage() {
           카드 명세서를 올리면, 소비 패턴을 정리해드립니다
         </h1>
         <p className="text-base leading-[1.6] text-ink-muted">
-          카드사마다 제각각인 명세서 CSV를 업로드하기만 하면 거래를 분석해
+          카드사마다 제각각인 명세서를 CSV나 PDF 그대로 업로드하기만 하면 거래를 분석해
           카테고리별 지출과 월별 추이를 대시보드에서 보여줍니다.
         </p>
         <GoogleSignInButton />

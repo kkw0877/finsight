@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it, beforeEach, vi } from "vitest";
+import { PDFDocument, StandardFonts } from "pdf-lib";
 import { createServerClient } from "@/lib/supabase/server";
 import { FREE_MONTHLY_LIMIT } from "@/lib/quota";
 import type { NextRequest } from "next/server";
@@ -51,6 +52,25 @@ function buildRequest(csvContent: string, filename = "statement.csv"): NextReque
   return { formData: async () => formData } as unknown as NextRequest;
 }
 
+function buildRequestWithFile(file: File): NextRequest {
+  const formData = new FormData();
+  formData.append("file", file);
+  return { formData: async () => formData } as unknown as NextRequest;
+}
+
+async function buildPdfFile(lines: string[], filename = "statement.pdf"): Promise<File> {
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const page = doc.addPage([400, 600]);
+  let y = 560;
+  for (const line of lines) {
+    page.drawText(line, { x: 40, y, size: 12, font });
+    y -= 20;
+  }
+  const bytes = await doc.save();
+  return new File([bytes], filename, { type: "application/pdf" });
+}
+
 describe("POST /api/upload", () => {
   beforeEach(async () => {
     const supabase = await createServerClient();
@@ -86,6 +106,35 @@ describe("POST /api/upload", () => {
       .select()
       .eq("uploadId", stored!.id);
     expect(transactions).toHaveLength(2);
+  });
+
+  it("정상 PDF를 분석해서 uploads/transactions에 저장하고 결과를 반환한다", async () => {
+    const file = await buildPdfFile([
+      "date merchant amount",
+      "2026-07-01 Starbucks Gangnam 4500",
+      "2026-07-02 GS25 3200",
+    ]);
+    const response = await POST(buildRequestWithFile(file));
+    expect(response.status).toBe(200);
+
+    const body = await response.json();
+    expect(body.blurred).toBe(false);
+    expect(body.transactions).toHaveLength(2);
+
+    const supabase = await createServerClient();
+    const { data: uploads } = await supabase.from("uploads").select().eq("userId", "mock-user-1");
+    const stored = uploads?.find((u) => u.storagePath.endsWith(".pdf"));
+    expect(stored).toBeDefined();
+    expect(stored?.storagePath).toMatch(/^mock-user-1\/[^/]+\.pdf$/);
+    expect(stored?.storagePath).not.toContain("statement.pdf");
+  });
+
+  it("지원하지 않는 파일 형식이면 400을 반환한다", async () => {
+    const file = new File(["dummy"], "statement.xlsx", {
+      type: "application/vnd.ms-excel",
+    });
+    const response = await POST(buildRequestWithFile(file));
+    expect(response.status).toBe(400);
   });
 
   it("파일 크기가 2MB를 초과하면 400을 반환한다", async () => {

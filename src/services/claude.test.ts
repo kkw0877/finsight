@@ -9,7 +9,7 @@ vi.mock("@anthropic-ai/sdk", () => ({
   })),
 }));
 
-const { classifyAndSummarize, parseCsvToTransactions } = await import("./claude");
+const { classifyAndSummarize, parseStatementToTransactions } = await import("./claude");
 
 const UPLOAD_ID = "upload-1";
 const USER_ID = "user-1";
@@ -22,7 +22,7 @@ beforeEach(() => {
   mockCreate.mockReset();
 });
 
-describe("parseCsvToTransactions", () => {
+describe("parseStatementToTransactions", () => {
   it("maps Claude's parsed rows into Transaction objects", async () => {
     mockCreate.mockResolvedValueOnce(
       textResponse({
@@ -33,7 +33,7 @@ describe("parseCsvToTransactions", () => {
       }),
     );
 
-    const transactions = await parseCsvToTransactions("csv-content", UPLOAD_ID, USER_ID);
+    const transactions = await parseStatementToTransactions("csv-content", UPLOAD_ID, USER_ID);
 
     expect(transactions).toHaveLength(2);
     expect(transactions[0]).toMatchObject({
@@ -49,27 +49,27 @@ describe("parseCsvToTransactions", () => {
   });
 
   it("throws on empty input without calling the API", async () => {
-    await expect(parseCsvToTransactions("", UPLOAD_ID, USER_ID)).rejects.toThrow();
-    await expect(parseCsvToTransactions("   \n  \n", UPLOAD_ID, USER_ID)).rejects.toThrow();
+    await expect(parseStatementToTransactions("", UPLOAD_ID, USER_ID)).rejects.toThrow();
+    await expect(parseStatementToTransactions("   \n  \n", UPLOAD_ID, USER_ID)).rejects.toThrow();
     expect(mockCreate).not.toHaveBeenCalled();
   });
 
   it("throws when Claude returns no parseable transactions", async () => {
     mockCreate.mockResolvedValueOnce(textResponse({ transactions: [] }));
-    await expect(parseCsvToTransactions("garbled csv", UPLOAD_ID, USER_ID)).rejects.toThrow();
+    await expect(parseStatementToTransactions("garbled csv", UPLOAD_ID, USER_ID)).rejects.toThrow();
   });
 
   it("throws a generic error without leaking failure details when the API call fails", async () => {
     mockCreate.mockRejectedValueOnce(new Error("network exploded with sensitive info"));
-    await expect(parseCsvToTransactions("csv", UPLOAD_ID, USER_ID)).rejects.toThrow(
-      "CSV 분석에 실패했습니다.",
+    await expect(parseStatementToTransactions("csv", UPLOAD_ID, USER_ID)).rejects.toThrow(
+      "명세서 분석에 실패했습니다.",
     );
   });
 
   it("throws a generic error when Claude's response is not valid JSON", async () => {
     mockCreate.mockResolvedValueOnce({ content: [{ type: "text", text: "not json" }] });
-    await expect(parseCsvToTransactions("csv", UPLOAD_ID, USER_ID)).rejects.toThrow(
-      "CSV 분석에 실패했습니다.",
+    await expect(parseStatementToTransactions("csv", UPLOAD_ID, USER_ID)).rejects.toThrow(
+      "명세서 분석에 실패했습니다.",
     );
   });
 });
