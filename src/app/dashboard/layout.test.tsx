@@ -14,6 +14,7 @@ vi.mock("@/lib/auth", () => ({
 }));
 
 import DashboardLayout from "./layout";
+import { createServerClient } from "@/lib/supabase/server";
 
 describe("DashboardLayout", () => {
   it("renders the logged-in user's name, a logout button, and its children", async () => {
@@ -23,5 +24,25 @@ describe("DashboardLayout", () => {
     expect(screen.getByText("Mock User")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "로그아웃" })).toBeInTheDocument();
     expect(screen.getByText("대시보드 콘텐츠")).toBeInTheDocument();
+  });
+
+  it("구독 정보가 없으면 FREE 뱃지를 보여준다", async () => {
+    const jsx = await DashboardLayout({ children: <div>대시보드 콘텐츠</div> });
+    render(jsx);
+
+    expect(screen.getByText("FREE")).toBeInTheDocument();
+  });
+
+  it("isPro가 true인 구독이 있으면 PRO 뱃지를 보여준다", async () => {
+    const supabase = await createServerClient();
+    await supabase.from("subscriptions").insert({
+      userId: "mock-user-1",
+      isPro: true,
+    });
+
+    const jsx = await DashboardLayout({ children: <div>대시보드 콘텐츠</div> });
+    render(jsx);
+
+    expect(screen.getByText("PRO")).toBeInTheDocument();
   });
 });
