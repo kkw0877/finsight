@@ -95,6 +95,12 @@ gh pr view <PR번호> --json files --jq '.files[].path'
 gh api repos/{owner}/{repo}/pulls/<PR번호>/reviews --method POST --input <json파일 경로>
 ```
 
+**본인이 작성한 PR인 경우 폴백**: 위 호출이 `"Can not request changes on your own pull request"`(또는 동일 취지의 self-review 관련) 메시지와 함께 422로 실패하면, GitHub가 PR 작성자 본인의 `APPROVE`/`REQUEST_CHANGES`를 막는 정책 때문이다(팀 레포에서 다른 사람 계정으로 실행하면 발생하지 않는다). 이 경우:
+
+1. JSON 파일의 `event`를 `COMMENT`로 바꾼다.
+2. `body`(PR 요약) 맨 앞에 `> ⚠️ PR 작성자 본인 계정으로 실행되어 GitHub 정책상 원래 판정(<Approve|Changes Requested|Blocked>)을 걸 수 없어 COMMENT로 게시됨\n\n`을 추가해, 실제 판정과 게시된 이벤트가 다르다는 걸 리뷰 본문에서 알 수 있게 한다.
+3. 같은 명령으로 재시도한다.
+
 성공하면 게시된 리뷰의 URL을 사용자에게 알린다.
 
 ## 범위 밖
