@@ -1,0 +1,36 @@
+name: Claude review-code (draft)
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            /review-code ${{ github.event.pull_request.number }}
+
+            이 실행은 비대화형 CI 자동화다. review-code.md의 1~5단계(PR 확정 → diff 확보 → 3개 서브에이전트 병렬 리뷰 → 결과 취합 → 초안 렌더링)는 그대로 따르되, 6~7단계(사람 승인 후 정식 게시)는 실행하지 마라 — 여기엔 승인할 사람이 없다.
+
+            대신 5단계에서 만든 인라인 코멘트 초안 전체와 PR 요약을 하나의 markdown 문서로 합쳐, 맨 위에 다음 안내문을 추가하라:
+            "> 🤖 자동 초안입니다 — 정식 게시(APPROVE/REQUEST_CHANGES)가 아닙니다. 사람이 검토 후 `/review-code ${{ github.event.pull_request.number }}`를 직접 실행해야 정식 리뷰로 게시됩니다."
+
+            이 문서를 `gh pr comment ${{ github.event.pull_request.number }} --body-file <파일경로>`로 일반 코멘트 하나만 남겨라. `gh api .../reviews`로 정식 리뷰 이벤트를 게시하지 마라.
+          claude_args: |
+            --allowedTools "Task,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*),Read,Grep,Glob"

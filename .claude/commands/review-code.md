@@ -34,6 +34,7 @@ gh pr view <PR번호> --json files --jq '.files[].path'
 - 심각도 집계: critical=🔴, major=🟠, minor=🟡, nit=⚪ 개수를 센다.
 - 판정: critical이 하나라도 있으면 **Blocked**, 없고 major가 있으면 **Changes Requested**, 둘 다 없으면 **Approve**.
 - 같은 file+line에 여러 finding이 겹치면 인라인 코멘트 하나로 합치고(각 finding을 블록으로 이어붙임), 요약의 집계 수치에는 각각 반영한다.
+- **diff 범위 확인**: GitHub PR review comments API는 diff의 변경 범위(hunk, `@@ -a,b +c,d @@`) 밖의 줄에는 인라인 코멘트를 달 수 없다(422로 전체 게시 실패). 각 finding의 file+line이 2단계에서 얻은 diff의 해당 파일 hunk `+` 범위 안에 있는지 확인하라. 범위 밖이면(리뷰어가 Read로 주변 파일 전체를 확인하다 나온 finding 등) 인라인 코멘트 대상에서 제외하고, 5번 PR 요약의 "Critical / Major" 목록에만 `<file>:<line>`으로 남긴다(집계 수치에는 그대로 반영).
 
 ## 5. 초안 렌더링 (게시 전, 반드시 먼저 보여줄 것)
 
