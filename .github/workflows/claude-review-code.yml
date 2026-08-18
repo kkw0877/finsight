@@ -33,4 +33,4 @@ jobs:
 
             이 문서를 `gh pr comment ${{ github.event.pull_request.number }} --body-file <파일경로>`로 일반 코멘트 하나만 남겨라. `gh api .../reviews`로 정식 리뷰 이벤트를 게시하지 마라.
           claude_args: |
-            --allowedTools "Task,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*),Read,Grep,Glob"
+            --allowedTools "Task,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*),Read,Write,Grep,Glob"
