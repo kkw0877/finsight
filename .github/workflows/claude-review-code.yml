@@ -5,13 +5,36 @@ on:
     types: [opened, synchronize]
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
   id-token: write
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run test
+
   review:
     runs-on: ubuntu-latest
+    outputs:
+      critical: ${{ steps.severity.outputs.critical }}
+      major: ${{ steps.severity.outputs.major }}
+      minor: ${{ steps.severity.outputs.minor }}
+      nit: ${{ steps.severity.outputs.nit }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -32,5 +55,87 @@ jobs:
             "> 🤖 자동 초안입니다 — 정식 게시(APPROVE/REQUEST_CHANGES)가 아닙니다. 사람이 검토 후 `/review-code ${{ github.event.pull_request.number }}`를 직접 실행해야 정식 리뷰로 게시됩니다."
 
             이 문서를 `gh pr comment ${{ github.event.pull_request.number }} --body-file <파일경로>`로 일반 코멘트 하나만 남겨라. `gh api .../reviews`로 정식 리뷰 이벤트를 게시하지 마라.
+
+            마지막으로, 4단계에서 집계한 critical/major/minor/nit 개수를 저장소 루트에 `.review-severity.txt` 파일로 Write 툴을 사용해 저장하라. 다른 텍스트 없이 정확히 아래 4줄만 담아라(숫자만 채워서):
+            CRITICAL=<critical 개수>
+            MAJOR=<major 개수>
+            MINOR=<minor 개수>
+            NIT=<nit 개수>
           claude_args: |
             --allowedTools "Task,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*),Read,Write,Grep,Glob"
+
+      - id: severity
+        run: |
+          set -euo pipefail
+          if [ ! -f .review-severity.txt ]; then
+            echo "::error::.review-severity.txt 가 없습니다 — 자동 승인/머지를 진행하지 않습니다." >&2
+            exit 1
+          fi
+          critical=$(grep -oP '^CRITICAL=\K[0-9]+' .review-severity.txt)
+          major=$(grep -oP '^MAJOR=\K[0-9]+' .review-severity.txt)
+          minor=$(grep -oP '^MINOR=\K[0-9]+' .review-severity.txt)
+          nit=$(grep -oP '^NIT=\K[0-9]+' .review-severity.txt)
+          echo "critical=$critical" >> "$GITHUB_OUTPUT"
+          echo "major=$major" >> "$GITHUB_OUTPUT"
+          echo "minor=$minor" >> "$GITHUB_OUTPUT"
+          echo "nit=$nit" >> "$GITHUB_OUTPUT"
+
+  gate:
+    needs: review
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    outputs:
+      tier: ${{ steps.decide.outputs.tier }}
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      CRITICAL: ${{ needs.review.outputs.critical }}
+      MAJOR: ${{ needs.review.outputs.major }}
+      MINOR: ${{ needs.review.outputs.minor }}
+    steps:
+      - id: decide
+        run: |
+          if [ "$CRITICAL" -gt 0 ] || [ "$MAJOR" -gt 0 ]; then
+            tier=blocked
+          elif [ "$MINOR" -gt 0 ]; then
+            tier=approve
+          else
+            tier=automerge
+          fi
+          echo "tier=$tier" >> "$GITHUB_OUTPUT"
+
+      - name: 정식 리뷰(APPROVE) 게시
+        if: steps.decide.outputs.tier != 'blocked'
+        run: |
+          set +e
+          cat > /tmp/review.json <<EOF
+          {
+            "commit_id": "${{ github.event.pull_request.head.sha }}",
+            "body": "자동 판정: ${{ steps.decide.outputs.tier }} (critical=$CRITICAL, major=$MAJOR, minor=$MINOR)",
+            "event": "APPROVE"
+          }
+          EOF
+          out=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews" --method POST --input /tmp/review.json 2>&1)
+          code=$?
+          set -e
+          if [ $code -ne 0 ]; then
+            if echo "$out" | grep -qi "own pull request"; then
+              echo "self-review 정책으로 formal APPROVE 불가 — 코멘트로 대체합니다."
+              gh pr comment ${{ github.event.pull_request.number }} --body "> ⚠️ PR 작성자 본인 계정으로 실행되어 GitHub 정책상 formal APPROVE를 게시할 수 없습니다. 자동 판정: ${{ steps.decide.outputs.tier }} (critical=$CRITICAL, major=$MAJOR, minor=$MINOR)"
+            else
+              echo "$out" >&2
+              exit 1
+            fi
+          fi
+
+  automerge:
+    needs: [gate, test]
+    if: needs.gate.outputs.tier == 'automerge'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - run: gh pr merge ${{ github.event.pull_request.number }} --squash --repo ${{ github.repository }}
