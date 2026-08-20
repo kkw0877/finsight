@@ -18,6 +18,9 @@ export function detectAndDecode(buffer: Buffer): string {
 
 const CARD_NUMBER_RE = /\b\d{4}[- ]\d{4}[- ]\d{4}[- ]\d{4}\b/g;
 const ACCOUNT_NUMBER_RE = /\b\d{2,6}-\d{2,6}-\d{2,10}(?:-\d{1,6})?\b/g;
+// 구분자 없이 붙어있는 카드/계좌번호 폴백 (OWASP A04/A06, docs/security-scans/owasp-scan-20260820.md).
+// 12자리 미만은 마스킹하지 않아 일반 거래 금액을 오탐 마스킹하지 않는다.
+const LONG_DIGIT_RUN_RE = /\b\d{12,16}\b/g;
 
 function maskKeepingLast4(match: string): string {
   const digits = match.replace(/\D/g, "");
@@ -38,6 +41,7 @@ export function maskSensitiveData(statementText: string): string {
   masked = masked.replace(ACCOUNT_NUMBER_RE, (match) =>
     isDateLike(match) ? match : maskKeepingLast4(match),
   );
+  masked = masked.replace(LONG_DIGIT_RUN_RE, maskKeepingLast4);
   return masked;
 }
 

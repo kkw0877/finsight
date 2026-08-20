@@ -56,6 +56,25 @@ describe("maskSensitiveData", () => {
     const input = "거래일자,2026-07-01,스타벅스,150000";
     expect(maskSensitiveData(input)).toBe(input);
   });
+
+  it("masks card numbers with no separators (16 consecutive digits)", () => {
+    const input = "카드번호,1234567890123456,매장,4500";
+    const result = maskSensitiveData(input);
+    expect(result).not.toContain("1234567890123456");
+    expect(result).toContain("3456");
+  });
+
+  it("masks account numbers with no separators (12+ digit run)", () => {
+    const input = "계좌번호,11023456789012,입금,10000";
+    const result = maskSensitiveData(input);
+    expect(result).not.toContain("11023456789012");
+    expect(result).toContain("9012");
+  });
+
+  it("does not mask digit runs under 12 digits (avoids masking amounts)", () => {
+    const input = "거래일자,2026-07-01,스타벅스,15000000000"; // 11-digit amount
+    expect(maskSensitiveData(input)).toBe(input);
+  });
 });
 
 describe("validateFileSize", () => {

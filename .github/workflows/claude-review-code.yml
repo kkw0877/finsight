@@ -5,7 +5,6 @@ on:
     types: [opened, synchronize]
 
 permissions:
-  contents: write
   pull-requests: write
   id-token: write
 
@@ -97,10 +96,8 @@ jobs:
         run: |
           if [ "$CRITICAL" -gt 0 ] || [ "$MAJOR" -gt 0 ]; then
             tier=blocked
-          elif [ "$MINOR" -gt 0 ]; then
-            tier=approve
           else
-            tier=automerge
+            tier=approve
           fi
           echo "tier=$tier" >> "$GITHUB_OUTPUT"
 
@@ -127,15 +124,3 @@ jobs:
               exit 1
             fi
           fi
-
-  automerge:
-    needs: [gate, test]
-    if: needs.gate.outputs.tier == 'automerge'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    steps:
-      - run: gh pr merge ${{ github.event.pull_request.number }} --squash --repo ${{ github.repository }}
