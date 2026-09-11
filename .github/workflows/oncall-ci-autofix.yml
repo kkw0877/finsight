@@ -34,6 +34,13 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 1
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
       - name: 실패한 잡 로그만 가져오기 + 2차 시크릿 마스킹
         run: |
           set -euo pipefail
@@ -87,6 +94,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
           NEXT_PUBLIC_SUPABASE_ANON_KEY: "placeholder-anon-key"
           SUPABASE_SERVICE_ROLE_KEY: "placeholder-service-role-key"
+          ANTHROPIC_API_KEY: "placeholder-anthropic-key"
           POLAR_ACCESS_TOKEN: "placeholder-polar-token"
           POLAR_WEBHOOK_SECRET: "placeholder-webhook-secret"
           POLAR_PRODUCT_ID: "placeholder-product-id"
