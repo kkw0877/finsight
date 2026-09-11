@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { captureServerEvent } from "@/lib/posthog-server";
 import { createServiceRoleClient } from "@/services/supabase-admin";
 import { verifyAndParseWebhook } from "@/services/polar";
 import type { Subscription } from "@/types/subscription";
@@ -30,6 +31,11 @@ export async function POST(request: NextRequest) {
   const supabase = createServiceRoleClient();
   const subscription: Subscription = { userId: result.userId, isPro: result.isPro };
   await supabase.from("subscriptions").upsert(subscription, { onConflict: "userId" });
+  await captureServerEvent({
+    distinctId: result.userId,
+    event: "subscription_updated",
+    properties: { is_pro: result.isPro },
+  });
 
   return NextResponse.json({ ok: true });
 }

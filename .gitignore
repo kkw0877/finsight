@@ -22,3 +22,6 @@ supabase/.temp/
 
 # stray worktree copies left by review agents
 .claude/worktrees/
+
+# PostHog 설치 마법사가 로컬에 남기는 캐시(팀 공유 불필요)
+.posthog-wizard-cache/

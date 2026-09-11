@@ -37,8 +37,22 @@ const mockCreate = vi.fn(async (params: MockCreateParams) => {
   });
 });
 
-vi.mock("@anthropic-ai/sdk", () => ({
-  default: vi.fn().mockImplementation(() => ({ messages: { create: mockCreate } })),
+vi.mock("@posthog/ai/anthropic", () => ({
+  Anthropic: vi.fn().mockImplementation(() => ({ messages: { create: mockCreate } })),
+}));
+
+vi.mock("posthog-node", () => ({
+  PostHog: vi.fn().mockImplementation(() => ({ flush: vi.fn() })),
+}));
+
+const { mockCaptureServerEvent, mockCaptureServerException } = vi.hoisted(() => ({
+  mockCaptureServerEvent: vi.fn(),
+  mockCaptureServerException: vi.fn(),
+}));
+
+vi.mock("@/lib/posthog-server", () => ({
+  captureServerEvent: mockCaptureServerEvent,
+  captureServerException: mockCaptureServerException,
 }));
 
 const { POST } = await import("./route");
@@ -75,6 +89,8 @@ describe("POST /api/upload", () => {
   beforeEach(async () => {
     const supabase = await createServerClient();
     await supabase.auth.signInWithOAuth({ provider: "google" });
+    mockCaptureServerEvent.mockClear();
+    mockCaptureServerException.mockClear();
   });
 
   it("비로그인 상태면 401을 반환한다", async () => {
@@ -129,12 +145,19 @@ describe("POST /api/upload", () => {
     expect(stored?.storagePath).not.toContain("statement.pdf");
   });
 
-  it("지원하지 않는 파일 형식이면 400을 반환한다", async () => {
+  it("지원하지 않는 파일 형식이면 400을 반환하고 실패 이벤트를 캡처한다", async () => {
     const file = new File(["dummy"], "statement.xlsx", {
       type: "application/vnd.ms-excel",
     });
     const response = await POST(buildRequestWithFile(file));
     expect(response.status).toBe(400);
+
+    expect(mockCaptureServerEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "statement_upload_failed",
+        properties: expect.objectContaining({ reason: "invalid_format" }),
+      }),
+    );
   });
 
   it("파일 크기가 2MB를 초과하면 400을 반환한다", async () => {
@@ -167,5 +190,24 @@ describe("POST /api/upload", () => {
     const body = await response.json();
     expect(body.blurred).toBe(true);
     expect(body.transactions).toHaveLength(2);
+  });
+
+  it("명세서 분석에 실패하면 500을 반환하고 예외와 실패 이벤트를 캡처한다", async () => {
+    mockCreate.mockRejectedValueOnce(new Error("Claude API 호출 실패"));
+
+    const response = await POST(buildRequest(VALID_CSV));
+    expect(response.status).toBe(500);
+
+    expect(mockCaptureServerEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "statement_upload_failed",
+        properties: expect.objectContaining({ reason: "analysis_failed" }),
+      }),
+    );
+    expect(mockCaptureServerException).toHaveBeenCalledWith(
+      expect.any(Error),
+      "mock-user-1",
+      expect.objectContaining({ file_format: "csv" }),
+    );
   });
 });

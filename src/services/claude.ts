@@ -1,11 +1,16 @@
-import Anthropic from "@anthropic-ai/sdk";
+import type Anthropic from "@anthropic-ai/sdk";
+import { Anthropic as PostHogAnthropic } from "@posthog/ai/anthropic";
+import { PostHog } from "posthog-node";
 import type { Category, Transaction } from "@/types/transaction";
 import type { AnalysisResult } from "@/types/analysis";
 import { aggregateTransactions } from "@/lib/aggregate";
 
 /**
  * ADR-004 2단계 호출: ①명세서→거래JSON 파싱(Haiku 4.5) → ②거래JSON→분류·요약(Sonnet 5).
- * ANTHROPIC_API_KEY는 이 파일 밖에서 참조하지 않는다 — SDK가 환경변수에서 직접 읽는다.
+ * ANTHROPIC_API_KEY는 이 파일 밖에서 참조하지 않는다 — 환경변수에서 직접 읽어 클라이언트 생성자에 전달한다.
+ * posthogPrivacyMode: true — 거래 내역(가맹점명·금액 등 민감 금융 데이터)이 $ai_generation
+ * 이벤트의 input/output으로 PostHog에 그대로 전송되지 않도록 막는다. 토큰 수·지연시간·비용 등
+ * 메타데이터만 캡처된다.
  */
 const PARSE_MODEL = "claude-haiku-4-5";
 const CLASSIFY_MODEL = "claude-sonnet-5";
@@ -22,7 +27,17 @@ const CATEGORIES: Category[] = [
   "기타",
 ];
 
-const client = new Anthropic();
+const posthog = new PostHog(process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN!, {
+  host: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+  flushAt: 1,
+  flushInterval: 0,
+});
+const client = new PostHogAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY!, posthog });
+
+/** Vercel 서버리스 함수 종료 전에 큐에 쌓인 $ai_generation 이벤트를 전송한다. */
+export async function flushAiObservability(): Promise<void> {
+  await posthog.flush();
+}
 
 const PARSE_SCHEMA = {
   type: "object",
@@ -95,6 +110,7 @@ export async function parseStatementToTransactions(
   statementText: string,
   uploadId: string,
   userId: string,
+  traceId: string,
 ): Promise<Transaction[]> {
   if (statementText.trim().length === 0) {
     throw new Error("빈 명세서는 파싱할 수 없습니다.");
@@ -112,7 +128,11 @@ export async function parseStatementToTransactions(
         "헤더 행이 있으면 건너뛰고, 각 거래에서 날짜(YYYY-MM-DD로 정규화)/가맹점명/금액(원 단위 정수, 부호 없이 절대값)을 추출한다. " +
         "취소·환불 행은 스킵한다. 파싱 가능한 거래가 하나도 없으면 transactions를 빈 배열로 반환한다.",
       messages: [{ role: "user", content: statementText }],
-    });
+      posthogDistinctId: userId,
+      posthogTraceId: traceId,
+      posthogProperties: { $ai_session_id: uploadId },
+      posthogPrivacyMode: true,
+    }) as Anthropic.Message;
   } catch {
     throw new Error("명세서 분석에 실패했습니다.");
   }
@@ -144,7 +164,10 @@ export async function parseStatementToTransactions(
  * 카테고리별/월별 집계·비율은 모델이 아닌 코드(aggregateTransactions)로 계산해 정확성을 보장하고,
  * summaryText만 모델이 생성한 값을 사용한다.
  */
-export async function classifyAndSummarize(transactions: Transaction[]): Promise<AnalysisResult> {
+export async function classifyAndSummarize(
+  transactions: Transaction[],
+  traceId: string,
+): Promise<AnalysisResult> {
   if (transactions.length === 0) {
     return aggregateTransactions([]);
   }
@@ -167,7 +190,11 @@ export async function classifyAndSummarize(transactions: Transaction[]): Promise
           ),
         },
       ],
-    });
+      posthogDistinctId: transactions[0].userId,
+      posthogTraceId: traceId,
+      posthogProperties: { $ai_session_id: transactions[0].uploadId },
+      posthogPrivacyMode: true,
+    }) as Anthropic.Message;
   } catch {
     throw new Error("거래 분류에 실패했습니다.");
   }

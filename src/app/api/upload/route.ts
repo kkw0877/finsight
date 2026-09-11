@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { canUpload } from "@/lib/quota";
+import { captureServerEvent, captureServerException } from "@/lib/posthog-server";
 import {
   detectAndDecode,
   maskSensitiveData,
@@ -9,10 +10,18 @@ import {
   validateRowCount,
 } from "@/lib/statement";
 import { extractTextFromPdf } from "@/lib/pdf";
-import { parseStatementToTransactions, classifyAndSummarize } from "@/services/claude";
+import { parseStatementToTransactions, classifyAndSummarize, flushAiObservability } from "@/services/claude";
 import type { Upload } from "@/types/upload";
 
 const STATEMENTS_BUCKET = "csv-uploads";
+
+async function trackUploadFailure(userId: string, reason: string, properties?: Record<string, unknown>) {
+  await captureServerEvent({
+    distinctId: userId,
+    event: "statement_upload_failed",
+    properties: { reason, ...properties },
+  });
+}
 
 /**
  * 실측(step 14 스파이크): 10행 파싱+분류 ~15초, 100행 ~67초 — 분류(Sonnet) 호출이 행 수에 비례해
@@ -44,6 +53,7 @@ export async function POST(request: NextRequest) {
   const formData = await request.formData();
   const file = formData.get("file");
   if (!(file instanceof Blob)) {
+    await trackUploadFailure(user.id, "missing_file");
     return NextResponse.json({ error: "파일이 필요합니다." }, { status: 400 });
   }
 
@@ -51,6 +61,7 @@ export async function POST(request: NextRequest) {
   try {
     format = resolveStatementFormat(file instanceof File ? file.name : "", file.type);
   } catch (err) {
+    await trackUploadFailure(user.id, "invalid_format");
     return NextResponse.json({ error: (err as Error).message }, { status: 400 });
   }
 
@@ -59,6 +70,7 @@ export async function POST(request: NextRequest) {
   try {
     validateFileSize(buffer.byteLength, format);
   } catch (err) {
+    await trackUploadFailure(user.id, "file_too_large", { file_format: format });
     return NextResponse.json({ error: (err as Error).message }, { status: 400 });
   }
 
@@ -66,12 +78,14 @@ export async function POST(request: NextRequest) {
   try {
     statementText = format === "pdf" ? await extractTextFromPdf(buffer) : detectAndDecode(buffer);
   } catch (err) {
+    await trackUploadFailure(user.id, "decode_failed", { file_format: format });
     return NextResponse.json({ error: (err as Error).message }, { status: 400 });
   }
 
   try {
     validateRowCount(statementText);
   } catch (err) {
+    await trackUploadFailure(user.id, "invalid_row_count", { file_format: format });
     return NextResponse.json({ error: (err as Error).message }, { status: 400 });
   }
 
@@ -79,17 +93,24 @@ export async function POST(request: NextRequest) {
   const storagePath = `${user.id}/${uploadId}.${format}`;
   const { error: storageError } = await supabase.storage.from(STATEMENTS_BUCKET).upload(storagePath, buffer);
   if (storageError) {
+    await trackUploadFailure(user.id, "storage_error", { file_format: format });
+    await captureServerException(storageError, user.id, { uploadId, file_format: format });
     return NextResponse.json({ error: "파일 저장에 실패했습니다." }, { status: 500 });
   }
 
   const maskedText = maskSensitiveData(statementText);
 
+  const traceId = crypto.randomUUID();
   let analysis;
   try {
-    const transactions = await parseStatementToTransactions(maskedText, uploadId, user.id);
-    analysis = await classifyAndSummarize(transactions);
-  } catch {
+    const transactions = await parseStatementToTransactions(maskedText, uploadId, user.id, traceId);
+    analysis = await classifyAndSummarize(transactions, traceId);
+  } catch (err) {
+    await trackUploadFailure(user.id, "analysis_failed", { file_format: format });
+    await captureServerException(err, user.id, { uploadId, traceId, file_format: format });
     return NextResponse.json({ error: "명세서 분석에 실패했습니다." }, { status: 500 });
+  } finally {
+    await flushAiObservability();
   }
 
   const uploadRow: Upload = {
@@ -102,6 +123,17 @@ export async function POST(request: NextRequest) {
   };
   await supabase.from("uploads").insert(uploadRow);
   await supabase.from("transactions").insert(analysis.transactions);
+
+  await captureServerEvent({
+    distinctId: user.id,
+    event: "statement_uploaded",
+    properties: {
+      file_format: format,
+      transaction_count: analysis.transactions.length,
+      is_pro: isPro,
+      result_blurred: blurred,
+    },
+  });
 
   return NextResponse.json({ ...analysis, blurred });
 }

@@ -36,7 +36,7 @@ export default async function DashboardLayout({
               </Tag>
             </div>
           </div>
-          <LogoutButton />
+          <LogoutButton user={user} />
         </div>
       </aside>
       <main className="mx-auto max-w-[1200px] flex-1 px-6 py-12">{children}</main>

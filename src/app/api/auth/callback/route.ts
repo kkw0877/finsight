@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { captureServerEvent } from "@/lib/posthog-server";
 import { createServerClient } from "@/lib/supabase/server";
 
 /**
@@ -13,6 +14,12 @@ export async function GET(request: NextRequest) {
     const supabase = await createServerClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        await captureServerEvent({ distinctId: user.id, event: "user_logged_in" });
+      }
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
   }

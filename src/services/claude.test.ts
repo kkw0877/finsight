@@ -3,9 +3,15 @@ import type { Transaction } from "@/types/transaction";
 
 const { mockCreate } = vi.hoisted(() => ({ mockCreate: vi.fn() }));
 
-vi.mock("@anthropic-ai/sdk", () => ({
-  default: vi.fn().mockImplementation(() => ({
+vi.mock("@posthog/ai/anthropic", () => ({
+  Anthropic: vi.fn().mockImplementation(() => ({
     messages: { create: mockCreate },
+  })),
+}));
+
+vi.mock("posthog-node", () => ({
+  PostHog: vi.fn().mockImplementation(() => ({
+    flush: vi.fn(),
   })),
 }));
 
@@ -13,6 +19,7 @@ const { classifyAndSummarize, parseStatementToTransactions } = await import("./c
 
 const UPLOAD_ID = "upload-1";
 const USER_ID = "user-1";
+const TRACE_ID = "trace-1";
 
 function textResponse(json: unknown) {
   return { content: [{ type: "text", text: JSON.stringify(json) }] };
@@ -33,7 +40,7 @@ describe("parseStatementToTransactions", () => {
       }),
     );
 
-    const transactions = await parseStatementToTransactions("csv-content", UPLOAD_ID, USER_ID);
+    const transactions = await parseStatementToTransactions("csv-content", UPLOAD_ID, USER_ID, TRACE_ID);
 
     expect(transactions).toHaveLength(2);
     expect(transactions[0]).toMatchObject({
@@ -48,27 +55,34 @@ describe("parseStatementToTransactions", () => {
     expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ model: "claude-haiku-4-5" }));
   });
 
+  it("거래 내역이 PostHog로 새어나가지 않도록 posthogPrivacyMode를 켜서 호출한다", async () => {
+    mockCreate.mockResolvedValueOnce(textResponse({ transactions: [] }));
+    await parseStatementToTransactions("csv-content", UPLOAD_ID, USER_ID, TRACE_ID).catch(() => {});
+
+    expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ posthogPrivacyMode: true }));
+  });
+
   it("throws on empty input without calling the API", async () => {
-    await expect(parseStatementToTransactions("", UPLOAD_ID, USER_ID)).rejects.toThrow();
-    await expect(parseStatementToTransactions("   \n  \n", UPLOAD_ID, USER_ID)).rejects.toThrow();
+    await expect(parseStatementToTransactions("", UPLOAD_ID, USER_ID, TRACE_ID)).rejects.toThrow();
+    await expect(parseStatementToTransactions("   \n  \n", UPLOAD_ID, USER_ID, TRACE_ID)).rejects.toThrow();
     expect(mockCreate).not.toHaveBeenCalled();
   });
 
   it("throws when Claude returns no parseable transactions", async () => {
     mockCreate.mockResolvedValueOnce(textResponse({ transactions: [] }));
-    await expect(parseStatementToTransactions("garbled csv", UPLOAD_ID, USER_ID)).rejects.toThrow();
+    await expect(parseStatementToTransactions("garbled csv", UPLOAD_ID, USER_ID, TRACE_ID)).rejects.toThrow();
   });
 
   it("throws a generic error without leaking failure details when the API call fails", async () => {
     mockCreate.mockRejectedValueOnce(new Error("network exploded with sensitive info"));
-    await expect(parseStatementToTransactions("csv", UPLOAD_ID, USER_ID)).rejects.toThrow(
+    await expect(parseStatementToTransactions("csv", UPLOAD_ID, USER_ID, TRACE_ID)).rejects.toThrow(
       "명세서 분석에 실패했습니다.",
     );
   });
 
   it("throws a generic error when Claude's response is not valid JSON", async () => {
     mockCreate.mockResolvedValueOnce({ content: [{ type: "text", text: "not json" }] });
-    await expect(parseStatementToTransactions("csv", UPLOAD_ID, USER_ID)).rejects.toThrow(
+    await expect(parseStatementToTransactions("csv", UPLOAD_ID, USER_ID, TRACE_ID)).rejects.toThrow(
       "명세서 분석에 실패했습니다.",
     );
   });
@@ -102,12 +116,19 @@ describe("classifyAndSummarize", () => {
       }),
     );
 
-    const result = await classifyAndSummarize([t1, t2]);
+    const result = await classifyAndSummarize([t1, t2], TRACE_ID);
 
     expect(result.transactions.find((t) => t.id === t1.id)?.category).toBe("식비");
     expect(result.transactions.find((t) => t.id === t2.id)?.category).toBe("교통");
     expect(result.summaryText).toBe("이번 달은 식비와 교통비 지출이 두드러졌습니다.");
     expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ model: "claude-sonnet-5" }));
+  });
+
+  it("거래 내역이 PostHog로 새어나가지 않도록 posthogPrivacyMode를 켜서 호출한다", async () => {
+    mockCreate.mockResolvedValueOnce(textResponse({ classifications: [], summaryText: "" }));
+    await classifyAndSummarize([tx({})], TRACE_ID);
+
+    expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ posthogPrivacyMode: true }));
   });
 
   it("falls back to 기타 when Claude returns a category outside the fixed 9 or omits a transaction", async () => {
@@ -121,7 +142,7 @@ describe("classifyAndSummarize", () => {
       }),
     );
 
-    const result = await classifyAndSummarize([t1, t2]);
+    const result = await classifyAndSummarize([t1, t2], TRACE_ID);
 
     expect(result.transactions.find((t) => t.id === t1.id)?.category).toBe("기타");
     expect(result.transactions.find((t) => t.id === t2.id)?.category).toBe("기타");
@@ -141,7 +162,7 @@ describe("classifyAndSummarize", () => {
       }),
     );
 
-    const result = await classifyAndSummarize([t1, t2]);
+    const result = await classifyAndSummarize([t1, t2], TRACE_ID);
 
     const totalPercentage = result.categoryTotals.reduce((sum, c) => sum + c.percentage, 0);
     expect(totalPercentage).toBeCloseTo(100, 0);
@@ -157,14 +178,14 @@ describe("classifyAndSummarize", () => {
       textResponse({ classifications: [{ id: t1.id, category: "식비" }], summaryText: "" }),
     );
 
-    const result = await classifyAndSummarize([t1]);
+    const result = await classifyAndSummarize([t1], TRACE_ID);
 
     expect(result.summaryText).toContain("식비");
     expect(result.summaryText).toContain("420,000");
   });
 
   it("returns an empty result without calling the API when there are no transactions", async () => {
-    const result = await classifyAndSummarize([]);
+    const result = await classifyAndSummarize([], TRACE_ID);
 
     expect(result.categoryTotals).toEqual([]);
     expect(result.monthlyTrend).toEqual([]);
@@ -174,6 +195,6 @@ describe("classifyAndSummarize", () => {
 
   it("throws a generic error without leaking details when the API call fails", async () => {
     mockCreate.mockRejectedValueOnce(new Error("network exploded"));
-    await expect(classifyAndSummarize([tx({})])).rejects.toThrow("거래 분류에 실패했습니다.");
+    await expect(classifyAndSummarize([tx({})], TRACE_ID)).rejects.toThrow("거래 분류에 실패했습니다.");
   });
 });
