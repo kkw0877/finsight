@@ -69,4 +69,38 @@ describe("LandingPage", () => {
       expect(within(section as HTMLElement).getByText(label)).toBeInTheDocument();
     }
   });
+
+  it("renders the FAQ section answering common pre-signup questions", () => {
+    render(<LandingPage />);
+    expect(
+      screen.getByRole("heading", { name: "자주 묻는 질문" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("PDF 카드 명세서도 업로드할 수 있나요?"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("카드사마다 CSV 형식이 다른데 괜찮나요?"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("제 카드번호나 계좌번호가 노출되나요?"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("무료로 몇 번까지 업로드할 수 있나요?"),
+    ).toBeInTheDocument();
+  });
+
+  it("emits FAQPage and SoftwareApplication JSON-LD for search results", () => {
+    const { container } = render(<LandingPage />);
+    const scripts = container.querySelectorAll(
+      'script[type="application/ld+json"]',
+    );
+    const parsed = Array.from(scripts).map((s) =>
+      JSON.parse(s.textContent ?? "{}"),
+    );
+    expect(parsed.map((p) => p["@type"])).toEqual(
+      expect.arrayContaining(["FAQPage", "SoftwareApplication"]),
+    );
+    const faq = parsed.find((p) => p["@type"] === "FAQPage");
+    expect(faq.mainEntity).toHaveLength(4);
+  });
 });
