@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      # 빌드 시점 정적 페이지 수집(page data collection)에만 필요한 더미 값 — 실제 자격증명이 아니다.
+      # (Supabase 클라이언트가 생성자에서 URL을 즉시 파싱하기 때문에 값이 비어 있으면 빌드 자체가 실패한다.)
+      NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: "placeholder-anon-key"
+      SUPABASE_SERVICE_ROLE_KEY: "placeholder-service-role-key"
+      ANTHROPIC_API_KEY: "placeholder-anthropic-key"
+      POLAR_ACCESS_TOKEN: "placeholder-polar-token"
+      POLAR_WEBHOOK_SECRET: "placeholder-webhook-secret"
+      POLAR_PRODUCT_ID: "placeholder-product-id"
+      NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+      NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN: "placeholder-posthog-token"
+      NEXT_PUBLIC_POSTHOG_HOST: "https://us.i.posthog.com"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+      - run: npm run test
