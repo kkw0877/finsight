@@ -1,0 +1,112 @@
+name: OWASP Top 10 격주 스캔
+
+on:
+  schedule:
+    - cron: '0 0 * * 1' # 매주 월요일 00:00 UTC (09:00 KST) — 아래 check-cadence가 격주만 통과시킴
+  workflow_dispatch: {} # 수동 실행 시 주기 판정 없이 항상 실행
+
+jobs:
+  check-cadence:
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.check.outputs.should_run }}
+    steps:
+      - id: check
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          epoch="2026-08-24" # 기준 월요일 — 이후 14일 간격으로만 실행
+          today=$(date -u +%Y-%m-%d)
+          days=$(( ( $(date -u -d "$today" +%s) - $(date -u -d "$epoch" +%s) ) / 86400 ))
+          if [ $(( days % 14 )) -eq 0 ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  scan:
+    needs: check-cadence
+    if: needs.check-cadence.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+    outputs:
+      critical: ${{ steps.severity.outputs.critical }}
+      major: ${{ steps.severity.outputs.major }}
+      pr_url: ${{ steps.severity.outputs.pr_url }}
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: 스캔 브랜치 생성
+        run: |
+          branch="security/owasp-scan-$(date -u +%Y%m%d)"
+          echo "branch=$branch" >> "$GITHUB_ENV"
+          git checkout -b "$branch"
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            REPO: ${{ github.repository }}
+
+            /owasp-scan
+
+            이 실행은 비대화형 CI 자동화다. owasp-scan.md의 1~5단계(스캔 대상 확정 → 동적 데이터 선수집 → 5개 서브에이전트 병렬 스캔 → 결과 취합 → 마크다운 리포트 생성)를 그대로 따른다.
+
+            이 CI 환경에는 Supabase MCP 서버가 연결되어 있지 않다 — 2단계의 Supabase advisor/테이블 조회는 시도하지 말고 바로 "Supabase 미연결 — 정적 마이그레이션 파일 확인으로 대체"로 기록한 뒤 진행하라.
+
+            5단계까지 끝나 리포트 파일이 저장되면, 6단계(채팅 보고) 대신 다음을 수행하라:
+            1. `git add docs/security-scans/` 로 리포트 파일을 스테이징한다.
+            2. `git commit -m "docs(security): OWASP Top 10 격주 스캔 리포트 추가"` 로 커밋한다.
+            3. `git push -u origin ${{ env.branch }}` 로 푸시한다.
+            4. critical/major/minor/nit 집계 표와 "다음 액션" 섹션만 요약한 임시 파일을 Write 툴로 만든 뒤, `gh pr create --title "docs(security): OWASP 격주 스캔 $(date -u +%Y-%m-%d)" --body-file <임시파일경로>` 로 PR을 연다. PR 본문에 리포트 전문을 다시 붙여넣지 말 것 — 요약만 넣고 "전체 리포트는 이 PR의 diff 참고"라고 안내한다. `gh pr create` 명령의 표준출력(PR URL)을 그대로 `.owasp-scan-pr-url.txt` 파일로 저장한다(예: `gh pr create ... | tee .owasp-scan-pr-url.txt`).
+            5. 마지막으로, 4단계(결과 취합)에서 집계한 critical/major/minor/nit 개수를 저장소 루트에 `.owasp-scan-severity.txt` 파일로 Write 툴을 사용해 저장한다. 다른 텍스트 없이 정확히 아래 4줄만 담는다(숫자만 채워서):
+            CRITICAL=<critical 개수>
+            MAJOR=<major 개수>
+            MINOR=<minor 개수>
+            NIT=<nit 개수>
+          claude_args: |
+            --allowedTools "Task,Bash(npm audit:*),Bash(git add:*),Bash(git commit:*),Bash(git push:*),Bash(gh pr create:*),Read,Write,Grep,Glob"
+
+      - id: severity
+        run: |
+          set -euo pipefail
+          if [ ! -f .owasp-scan-severity.txt ] || [ ! -f .owasp-scan-pr-url.txt ]; then
+            echo "::error::.owasp-scan-severity.txt 또는 .owasp-scan-pr-url.txt 가 없습니다 — 이슈 자동 생성을 진행하지 않습니다." >&2
+            exit 1
+          fi
+          critical=$(grep -oP '^CRITICAL=\K[0-9]+' .owasp-scan-severity.txt)
+          major=$(grep -oP '^MAJOR=\K[0-9]+' .owasp-scan-severity.txt)
+          pr_url=$(tail -n 1 .owasp-scan-pr-url.txt)
+          echo "critical=$critical" >> "$GITHUB_OUTPUT"
+          echo "major=$major" >> "$GITHUB_OUTPUT"
+          echo "pr_url=$pr_url" >> "$GITHUB_OUTPUT"
+
+      - name: critical/major 발견 시 Issue 생성
+        if: steps.severity.outputs.critical != '0' || steps.severity.outputs.major != '0'
+        env:
+          CRITICAL: ${{ steps.severity.outputs.critical }}
+          MAJOR: ${{ steps.severity.outputs.major }}
+          PR_URL: ${{ steps.severity.outputs.pr_url }}
+        run: |
+          body=$(printf '격주 OWASP Top 10 스캔에서 critical=%s, major=%s 건이 발견되었습니다.\n\n리포트 PR: %s\n\nPR을 검토하고 필요한 조치를 진행해 주세요.' "$CRITICAL" "$MAJOR" "$PR_URL")
+          gh issue create \
+            --title "🔴 OWASP 격주 스캔: critical/major 발견 ($(date -u +%Y-%m-%d))" \
+            --body "$body" \
+            --assignee kkw0877
