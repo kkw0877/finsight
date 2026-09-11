@@ -86,3 +86,5 @@ Polar 웹훅(/api/webhooks/polar) → 서명 검증 → subscriptions 레코드 
 
 ## 배포
 Vercel + Vercel CLI(`vercel deploy` / `vercel deploy --prod`)로 배포한다. mock/스켈레톤 상태부터 가장 먼저 배포해 빌드·배포 파이프라인(환경변수, 함수 설정 등)을 조기에 검증하고, 이후 각 개발 단계(step)를 완료할 때마다 재배포해 항상 배포 가능한 상태를 유지한다.
+
+DB 환경(스테이징·PR 프리뷰)은 Supabase Branching으로 분리한다(ADR-011, `docs/SUPABASE_BRANCHING.md`).

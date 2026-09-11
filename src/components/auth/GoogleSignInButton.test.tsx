@@ -33,4 +33,23 @@ describe("GoogleSignInButton", () => {
       method: "POST",
     });
   });
+
+  it("로그인 API가 에러를 반환하면 에러 메시지를 보여주고 리다이렉트하지 않는다", async () => {
+    fetchMock.mockImplementationOnce(
+      async () =>
+        new Response(JSON.stringify({ error: "PR 프리뷰 환경에서는 Google 로그인을 사용할 수 없습니다." }), {
+          status: 403,
+        }),
+    );
+
+    render(<GoogleSignInButton />);
+    fireEvent.click(screen.getByRole("button", { name: "Google로 로그인" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "PR 프리뷰 환경에서는 Google 로그인을 사용할 수 없습니다.",
+      ),
+    );
+    expect(pushMock).not.toHaveBeenCalled();
+  });
 });

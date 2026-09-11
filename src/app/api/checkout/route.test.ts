@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createServerClient } from "@/lib/supabase/server";
 
 const { mockCheckoutsCreate } = vi.hoisted(() => ({ mockCheckoutsCreate: vi.fn() }));
@@ -18,6 +18,21 @@ describe("POST /api/checkout", () => {
     mockCheckoutsCreate.mockReset();
     mockCheckoutsCreate.mockResolvedValue({ url: "https://polar.sh/checkout/abc" });
     vi.stubEnv("POLAR_PRODUCT_ID", "prod-123");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("Vercel Preview 환경(VERCEL_ENV=preview)에서는 403과 에러 메시지를 반환한다", async () => {
+    vi.stubEnv("VERCEL_ENV", "preview");
+
+    const response = await POST();
+    expect(response.status).toBe(403);
+
+    const body = await response.json();
+    expect(body.error).toBeTruthy();
+    expect(mockCheckoutsCreate).not.toHaveBeenCalled();
   });
 
   it("비로그인 상태면 401을 반환한다", async () => {
