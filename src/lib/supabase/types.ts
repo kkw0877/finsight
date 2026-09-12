@@ -1,6 +1,7 @@
 import type { Transaction } from "@/types/transaction";
 import type { Upload } from "@/types/upload";
 import type { Subscription } from "@/types/subscription";
+import type { OncallAlertEvent } from "@/types/oncall";
 
 export interface MockUser {
   id: string;
@@ -8,24 +9,28 @@ export interface MockUser {
   name?: string;
 }
 
+/** Postgres 에러 코드(예: 23505 unique_violation)를 보존한 에러 — route 핸들러의 멱등 판정에 필요하다. */
+export type DbError = Error & { code?: string };
+
 export interface QueryResult<T> {
   data: T[] | null;
-  error: Error | null;
+  error: DbError | null;
 }
 
 export interface SingleQueryResult<T> {
   data: T | null;
-  error: Error | null;
+  error: DbError | null;
 }
 
 /**
  * supabase-js의 PostgrestFilterBuilder 서브셋.
- * select/insert로 모드를 정하고, eq로 필터를 쌓은 뒤 await하거나 single()로 종료한다.
+ * select/insert/delete로 모드를 정하고, eq로 필터를 쌓은 뒤 await하거나 single()로 종료한다.
  */
 export interface TableQuery<T> extends PromiseLike<QueryResult<T>> {
   select(columns?: string): TableQuery<T>;
   insert(rows: T | T[]): TableQuery<T>;
   upsert(rows: T | T[], options: { onConflict: keyof T & string }): TableQuery<T>;
+  delete(): TableQuery<T>;
   eq(column: keyof T & string, value: unknown): TableQuery<T>;
   single(): Promise<SingleQueryResult<T>>;
 }
@@ -34,6 +39,7 @@ export interface TableRowMap {
   uploads: Upload;
   transactions: Transaction;
   subscriptions: Subscription;
+  oncall_alert_events: OncallAlertEvent;
 }
 
 export type TableName = keyof TableRowMap;

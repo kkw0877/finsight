@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
+  DbError,
   QueryResult,
   SingleQueryResult,
   StorageDownloadResult,
@@ -31,20 +32,21 @@ function toCamelRow<T>(row: Record<string, unknown>): T {
   return Object.fromEntries(Object.entries(row).map(([key, value]) => [snakeToCamel(key), value])) as T;
 }
 
-function toError(error: { message: string } | null): Error | null {
-  return error ? new Error(error.message) : null;
+function toError(error: { message: string; code?: string } | null): DbError | null {
+  return error ? Object.assign(new Error(error.message), { code: error.code }) : null;
 }
 
 /**
  * supabase-js PostgrestFilterBuilder의 서브셋 — types.ts의 TableQuery 계약만 필요하다.
  */
 interface PostgrestBuilder
-  extends PromiseLike<{ data: Record<string, unknown>[] | null; error: { message: string } | null }> {
+  extends PromiseLike<{ data: Record<string, unknown>[] | null; error: { message: string; code?: string } | null }> {
   select(columns?: string): PostgrestBuilder;
   insert(rows: unknown): PostgrestBuilder;
   upsert(rows: unknown, options: { onConflict: string }): PostgrestBuilder;
+  delete(): PostgrestBuilder;
   eq(column: string, value: unknown): PostgrestBuilder;
-  single(): Promise<{ data: Record<string, unknown> | null; error: { message: string } | null }>;
+  single(): Promise<{ data: Record<string, unknown> | null; error: { message: string; code?: string } | null }>;
 }
 
 class RealTableQuery<K extends TableName> implements TableQuery<TableRowMap[K]> {
@@ -69,6 +71,10 @@ class RealTableQuery<K extends TableName> implements TableQuery<TableRowMap[K]> 
       ? rows.map((row) => toSnakeRow(row as unknown as Record<string, unknown>))
       : toSnakeRow(rows as unknown as Record<string, unknown>);
     return new RealTableQuery(this.builder.upsert(payload, { onConflict: camelToSnake(options.onConflict) }));
+  }
+
+  delete(): TableQuery<TableRowMap[K]> {
+    return new RealTableQuery(this.builder.delete());
   }
 
   eq(column: keyof TableRowMap[K] & string, value: unknown): TableQuery<TableRowMap[K]> {

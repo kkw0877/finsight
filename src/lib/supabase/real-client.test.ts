@@ -6,9 +6,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * supabase-js의 PostgrestFilterBuilder를 흉내내는 최소 페이크.
  * DB 컬럼은 snake_case, 어댑터가 camelCase로 왕복 변환하는지 검증한다.
  */
-function createFakeBuilder(rows: Record<string, unknown>[]) {
+function createFakeBuilder(rows: Record<string, unknown>[], opts: { insertError?: { message: string; code?: string } } = {}) {
   const state: {
-    mode: "select" | "insert" | "upsert";
+    mode: "select" | "insert" | "upsert" | "delete";
     inserted: Record<string, unknown>[];
     onConflict?: string;
     filters: [string, unknown][];
@@ -33,6 +33,10 @@ function createFakeBuilder(rows: Record<string, unknown>[]) {
         return builder;
       },
     ),
+    delete: vi.fn(() => {
+      state.mode = "delete";
+      return builder;
+    }),
     eq: vi.fn((column: string, value: unknown) => {
       state.filters.push([column, value]);
       return builder;
@@ -49,6 +53,7 @@ function createFakeBuilder(rows: Record<string, unknown>[]) {
 
   async function execute() {
     if (state.mode === "insert") {
+      if (opts.insertError) return { data: null, error: opts.insertError };
       rows.push(...state.inserted);
       return { data: state.inserted, error: null };
     }
@@ -61,6 +66,12 @@ function createFakeBuilder(rows: Record<string, unknown>[]) {
       }
       return { data: state.inserted, error: null };
     }
+    if (state.mode === "delete") {
+      for (let i = rows.length - 1; i >= 0; i--) {
+        if (state.filters.every(([col, val]) => rows[i][col] === val)) rows.splice(i, 1);
+      }
+      return { data: null, error: null };
+    }
     const matched = rows.filter((row) => state.filters.every(([col, val]) => row[col] === val));
     return { data: matched, error: null };
   }
@@ -71,6 +82,7 @@ function createFakeBuilder(rows: Record<string, unknown>[]) {
 function createFakeSupabaseClient(opts: {
   user?: { id: string; email: string; user_metadata?: Record<string, unknown> } | null;
   tableRows?: Record<string, unknown>[];
+  insertError?: { message: string; code?: string };
 } = {}) {
   const rows = opts.tableRows ?? [];
   return {
@@ -82,7 +94,7 @@ function createFakeSupabaseClient(opts: {
       signOut: vi.fn(async () => ({ error: null })),
       exchangeCodeForSession: vi.fn(async () => ({ error: null })),
     },
-    from: vi.fn(() => createFakeBuilder(rows)),
+    from: vi.fn(() => createFakeBuilder(rows, { insertError: opts.insertError })),
     storage: {
       from: vi.fn(() => ({
         upload: vi.fn(async (path: string) => ({ data: { path }, error: null })),
@@ -134,6 +146,29 @@ describe("createRealClient", () => {
     );
     const { data } = await client.auth.getUser();
     expect(data.user).toEqual({ id: "user-1", email: "a@b.com", name: "A" });
+  });
+
+  it("delete().eq() removes matched rows after converting the filter column to snake_case", async () => {
+    const rows: Record<string, unknown>[] = [{ event_id: "evt-1" }, { event_id: "evt-2" }];
+    const client = createRealClient(createFakeSupabaseClient({ tableRows: rows }));
+
+    await client.from("oncall_alert_events").delete().eq("eventId", "evt-1");
+
+    expect(rows).toEqual([{ event_id: "evt-2" }]);
+  });
+
+  it("preserves the Postgres error code (e.g. 23505) on insert failure", async () => {
+    const client = createRealClient(
+      createFakeSupabaseClient({ insertError: { message: "duplicate key value violates unique constraint", code: "23505" } }),
+    );
+
+    const { error } = await client.from("oncall_alert_events").insert({
+      eventId: "evt-1",
+      triggerType: "issue_created",
+      issueFingerprint: "fp-1",
+    });
+
+    expect(error?.code).toBe("23505");
   });
 
   it("passes through storage upload/download", async () => {

@@ -25,11 +25,18 @@ const store: {
   uploads: TableRowMap["uploads"][];
   transactions: TableRowMap["transactions"][];
   subscriptions: TableRowMap["subscriptions"][];
+  oncall_alert_events: TableRowMap["oncall_alert_events"][];
 } = {
   currentUser: MOCK_USER,
   uploads: [],
   transactions: [],
   subscriptions: [],
+  oncall_alert_events: [],
+};
+
+/** 실제 Postgres의 primary key 제약을 흉내내는, 테이블별 유일 키 컬럼. */
+const PRIMARY_KEYS: Partial<Record<TableName, string>> = {
+  oncall_alert_events: "eventId",
 };
 
 const storageObjects = new Map<string, Buffer>();
@@ -44,7 +51,7 @@ async function toBuffer(file: Buffer | Blob): Promise<Buffer> {
 }
 
 class MockTableQuery<K extends TableName> implements TableQuery<TableRowMap[K]> {
-  private mode: "select" | "insert" | "upsert" = "select";
+  private mode: "select" | "insert" | "upsert" | "delete" = "select";
   private insertRows: TableRowMap[K][] = [];
   private onConflictColumn?: string;
   private returnInsertedRows = false;
@@ -64,6 +71,11 @@ class MockTableQuery<K extends TableName> implements TableQuery<TableRowMap[K]> 
   insert(rows: TableRowMap[K] | TableRowMap[K][]): TableQuery<TableRowMap[K]> {
     this.mode = "insert";
     this.insertRows = Array.isArray(rows) ? rows : [rows];
+    return this;
+  }
+
+  delete(): TableQuery<TableRowMap[K]> {
+    this.mode = "delete";
     return this;
   }
 
@@ -102,8 +114,36 @@ class MockTableQuery<K extends TableName> implements TableQuery<TableRowMap[K]> 
     const rows = store[this.table] as TableRowMap[K][];
 
     if (this.mode === "insert") {
+      const primaryKey = PRIMARY_KEYS[this.table];
+      if (primaryKey) {
+        const hasDuplicate = this.insertRows.some((row) =>
+          rows.some(
+            (existing) =>
+              (existing as unknown as Record<string, unknown>)[primaryKey] ===
+              (row as unknown as Record<string, unknown>)[primaryKey],
+          ),
+        );
+        if (hasDuplicate) {
+          return {
+            data: null,
+            error: Object.assign(new Error(`${this.table}: duplicate key value violates unique constraint`), {
+              code: "23505",
+            }),
+          };
+        }
+      }
       rows.push(...this.insertRows);
       return { data: this.returnInsertedRows ? this.insertRows : null, error: null };
+    }
+
+    if (this.mode === "delete") {
+      for (let i = rows.length - 1; i >= 0; i--) {
+        const row = rows[i] as unknown as Record<string, unknown>;
+        if (this.filters.every(([column, value]) => row[column] === value)) {
+          rows.splice(i, 1);
+        }
+      }
+      return { data: null, error: null };
     }
 
     if (this.mode === "upsert") {

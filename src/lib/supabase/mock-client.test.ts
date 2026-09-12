@@ -140,6 +140,40 @@ describe("createMockClient table queries", () => {
     expect(error).toBeNull();
     expect(data).toEqual([{ userId: "sub-user-2", isPro: true }]);
   });
+
+  it("insert() rejects a duplicate primary key with a 23505-coded error (oncall_alert_events)", async () => {
+    const client = createMockClient();
+    const first = await client
+      .from("oncall_alert_events")
+      .insert({ eventId: "evt-1", triggerType: "issue_created", issueFingerprint: "fp-1" });
+    expect(first.error).toBeNull();
+
+    const second = await client
+      .from("oncall_alert_events")
+      .insert({ eventId: "evt-1", triggerType: "issue_spiking", issueFingerprint: "fp-1" });
+    expect(second.error?.code).toBe("23505");
+
+    const { data } = await client.from("oncall_alert_events").select().eq("eventId", "evt-1");
+    expect(data).toHaveLength(1);
+  });
+
+  it("delete().eq() removes only the matched rows", async () => {
+    const client = createMockClient();
+    await client
+      .from("oncall_alert_events")
+      .insert({ eventId: "evt-2", triggerType: "issue_created", issueFingerprint: "fp-2" });
+    await client
+      .from("oncall_alert_events")
+      .insert({ eventId: "evt-3", triggerType: "issue_created", issueFingerprint: "fp-3" });
+
+    const { error } = await client.from("oncall_alert_events").delete().eq("eventId", "evt-2");
+    expect(error).toBeNull();
+
+    const remaining = await client.from("oncall_alert_events").select().eq("eventId", "evt-2");
+    expect(remaining.data).toHaveLength(0);
+    const untouched = await client.from("oncall_alert_events").select().eq("eventId", "evt-3");
+    expect(untouched.data).toHaveLength(1);
+  });
 });
 
 describe("createMockClient storage", () => {
