@@ -1,0 +1,117 @@
+name: Oncall Prod Alert
+
+# 트리거: src/app/api/webhooks/posthog-alert/[secret]/route.ts가 서명/시크릿 검증 +
+# 멱등(event_id 선삽입)까지 마친 뒤 GitHub repository_dispatch로 위임한 이벤트.
+# 실제 노이즈/신호 판정·분석·escalation은 전부 이 잡(헤드리스 Claude)에서 수행한다.
+# 참고: docs/ADR.md ADR-012, docs/oncall/known-noise.md
+on:
+  repository_dispatch:
+    types: [posthog-oncall-alert]
+
+concurrency:
+  group: oncall-prod-alert-${{ github.event.client_payload.fingerprint }}
+  cancel-in-progress: false
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 200 # 최근 커밋 상관관계 분석용 — 전체 이력은 불필요
+
+      - name: 하네스(dispatch payload) 파일로 저장
+        env:
+          HARNESS_JSON: ${{ toJSON(github.event.client_payload) }}
+        run: |
+          set -euo pipefail
+          # exception name/description은 공격자 영향권 텍스트일 수 있으니 쉘에 직접
+          # 전개하지 않고 env var → printf로만 파일에 옮긴다.
+          printf '%s' "$HARNESS_JSON" > /tmp/oncall-alert-harness.json
+          echo "harness saved: $(wc -c < /tmp/oncall-alert-harness.json) bytes"
+
+      - name: PostHog에서 영향 인원수 보강 조회 (read-only, 실패해도 계속 진행)
+        env:
+          POSTHOG_PERSONAL_API_KEY: ${{ secrets.POSTHOG_PERSONAL_API_KEY }}
+          POSTHOG_PROJECT_ID: ${{ secrets.POSTHOG_PROJECT_ID }}
+          POSTHOG_HOST: ${{ vars.POSTHOG_HOST || 'https://us.i.posthog.com' }}
+          ISSUE_ID: ${{ github.event.client_payload.issueId }}
+        run: |
+          set -uo pipefail
+          if [ -z "${POSTHOG_PERSONAL_API_KEY:-}" ] || [ -z "${POSTHOG_PROJECT_ID:-}" ] || [ -z "${ISSUE_ID:-}" ]; then
+            echo '{"note":"POSTHOG_PERSONAL_API_KEY/POSTHOG_PROJECT_ID 미설정 또는 issueId 없음 — 인원수 확인 불가"}' > /tmp/oncall-alert-affected.json
+            exit 0
+          fi
+
+          curl -sS --fail-with-body \
+            -H "Authorization: Bearer ${POSTHOG_PERSONAL_API_KEY}" \
+            -H "Content-Type: application/json" \
+            "${POSTHOG_HOST}/api/projects/${POSTHOG_PROJECT_ID}/query" \
+            -d "$(printf '{"query":{"kind":"HogQLQuery","query":"select count(distinct person_id) from events where properties.$exception_issue_id = %s"}}' "'${ISSUE_ID}'")" \
+            > /tmp/oncall-alert-affected.json \
+            || echo '{"note":"PostHog 조회 실패 — 인원수 확인 불가"}' > /tmp/oncall-alert-affected.json
+
+          cat /tmp/oncall-alert-affected.json
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            트리거: PostHog error tracking alert (fingerprint ${{ github.event.client_payload.fingerprint }})
+
+            이 실행은 사람이 요청한 게 아니다 — prod 웹훅이 위임한 비대화형 oncall 1차 대응이다.
+            너의 역할은 딱 두 가지: (1) 이 알림이 노이즈인지 신호인지 판정하고 (2) 신호라면 근거를 담아
+            GitHub Issue로 escalate하는 것. **prod 코드/설정/DB에는 어떤 것도 쓰지 않는다** — 애초에
+            git log/grep/gh issue 관련 명령 외에는 허용되어 있지 않다(vercel/supabase 명령 자체가 없음).
+
+            1. `/tmp/oncall-alert-harness.json` 하나만 읽어라 — PostHog 원본 이벤트를 정규화한 값이다
+               (eventId, triggerType: issue_created|issue_spiking, fingerprint, issueId, name, description,
+               exceptionTimestamp, currentBucketValue, computedBaseline, projectUrl, deepLink).
+            2. `/tmp/oncall-alert-affected.json`도 읽어라 — PostHog에서 read-only로 보강 조회한 영향 인원수
+               (조회 실패/미설정이면 "확인 불가"로 취급하고, 그 사실 자체를 이슈 본문에 명시해라. 지어내지 마라).
+            3. `docs/oncall/known-noise.md`를 읽고 harness의 name/description/스택 특징이 여기 나열된
+               "알려진 노이즈" 패턴(브라우저 확장/봇/일시적 네트워크 등)과 일치하는지 대조해라.
+            4. 판정 기준:
+               - **노이즈**: known-noise.md의 패턴과 명확히 일치하고, 핵심 경로(업로드 `/api/upload`,
+                 결제 `/api/checkout`·`/api/webhooks/polar`, 인증 `/api/auth/*`)와 무관하며, 영향 인원이
+                 소수(1~2명)이거나 확인 불가하더라도 정황상 개별 환경 문제로 보이는 경우.
+               - **신호**: 새로운 에러 타입(issue_created), 급증(issue_spiking), 여러 유저에 걸친 발생,
+                 또는 핵심 경로에서 발생한 경우 — 이 중 하나라도 해당하면 신호로 처리한다.
+               - **경계 사례**(애매하면): 신호 쪽으로 기울여 escalate하되, 이슈 본문에 `신뢰도: 낮음`을
+                 명시해라. 판단이 안 서서 조용히 넘기지 마라.
+            5. 노이즈로 판정했다면: 이슈를 만들거나 코멘트를 달지 마라. 대신 `$GITHUB_STEP_SUMMARY`에
+               Bash로 판단 근거를 append해라(어떤 known-noise 패턴에 해당하는지 구체적으로).
+            6. 신호로 판정했다면 조사 후 escalate해라:
+               - **조사(read-only)**: harness의 `exceptionTimestamp` 근방 커밋을 `git log --oneline
+                 --since=...`로 찾아 후보를 추리고, `name`/`description`의 키워드로 코드베이스를
+                 grep해 관련 파일·핵심 경로 여부를 확인해라. 상관관계가 약하면 "특정 커밋과 상관관계
+                 낮음"이라고 정직하게 써라 — 확신 없는 커밋을 원인으로 단정하지 마라.
+               - **dedup**: `gh issue list --repo ${{ github.repository }} --label oncall-alert --state all
+                 --search "${{ github.event.client_payload.fingerprint }} in:body"`로 이 fingerprint를
+                 본문에 마커(`<!-- oncall-fingerprint:<fingerprint> -->`)로 가진 기존 이슈를 찾아라.
+                 - 열린 이슈가 있으면: `gh issue comment`로 새 발생 정보만 추가해라(새 이슈를 만들지 마라).
+                 - 닫힌 이슈가 있으면: `gh issue reopen` 후 `gh issue comment`로 재발 정보를 추가해라.
+                 - 없으면: `gh issue create --label oncall-alert`로 새로 만들어라(라벨이 없으면 먼저
+                   `gh label create`로 만들어라).
+               - **이슈/코멘트 본문 필수 항목**(전부 채워라. 모르면 "확인 불가"라고 써라):
+                 - 무슨 에러 / 언제부터
+                 - 몇 명 (2번에서 조회한 값, 실패 시 "확인 불가")
+                 - 의심 원인 (최근 커밋과의 겹침 여부 — 커밋 SHA/메시지 인용 또는 "상관관계 낮음")
+                 - 영향 범위 (핵심 경로 해당 여부)
+                 - 권장 액션 (사람이 다음에 뭘 해야 하는지)
+                 - 신뢰도: 낮음/중간/높음
+                 - 본문 최하단에 숨김 마커 `<!-- oncall-fingerprint:${{ github.event.client_payload.fingerprint }} -->`
+                 - PostHog 딥링크(harness의 deepLink, 있으면)
+               - 이슈 본문 최상단에 "> 🤖 이 이슈는 PostHog error tracking alert를 감지해 자동으로
+                 생성/갱신되었습니다 — prod에 어떤 것도 수정하지 않았습니다."를 넣어라.
+            7. 절대 하지 마라: PR 생성, 브랜치 생성/푸시, 코드 수정, `gh issue close`(사람이 직접
+               닫는다), `gh issue merge`류 명령, vercel/supabase 관련 명령(애초에 허용되지 않음).
+          claude_args: |
+            --allowedTools "Read,Grep,Glob,Bash(git log:*),Bash(git show:*),Bash(gh issue list:*),Bash(gh issue create:*),Bash(gh issue comment:*),Bash(gh issue reopen:*),Bash(gh label create:*)"
