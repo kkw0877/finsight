@@ -79,7 +79,6 @@ describe("parseAlertPayload", () => {
       exceptionTimestamp: "2026-09-12T00:00:00.000Z",
       currentBucketValue: null,
       computedBaseline: null,
-      projectUrl: "https://us.posthog.com/project/123",
       deepLink: expect.stringContaining("fp-abc"),
     });
   });

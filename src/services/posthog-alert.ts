@@ -66,7 +66,6 @@ export function parseAlertPayload(body: unknown): OncallAlertHarness | null {
     exceptionTimestamp,
     currentBucketValue: typeof props.current_bucket_value === "number" ? props.current_bucket_value : null,
     computedBaseline: typeof props.computed_baseline === "number" ? props.computed_baseline : null,
-    projectUrl,
     deepLink: projectUrl
       ? `${projectUrl}/error_tracking/fingerprint/${encodeURIComponent(fingerprint)}?timestamp=${encodeURIComponent(exceptionTimestamp)}&utm_source=alert&utm_campaign=error_tracking_alert&utm_medium=github`
       : "",

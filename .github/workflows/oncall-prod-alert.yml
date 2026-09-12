@@ -73,7 +73,7 @@ jobs:
 
             1. `/tmp/oncall-alert-harness.json` 하나만 읽어라 — PostHog 원본 이벤트를 정규화한 값이다
                (eventId, triggerType: issue_created|issue_spiking, fingerprint, issueId, name, description,
-               exceptionTimestamp, currentBucketValue, computedBaseline, projectUrl, deepLink).
+               exceptionTimestamp, currentBucketValue, computedBaseline, deepLink).
             2. `/tmp/oncall-alert-affected.json`도 읽어라 — PostHog에서 read-only로 보강 조회한 영향 인원수
                (조회 실패/미설정이면 "확인 불가"로 취급하고, 그 사실 자체를 이슈 본문에 명시해라. 지어내지 마라).
             3. `docs/oncall/known-noise.md`를 읽고 harness의 name/description/스택 특징이 여기 나열된

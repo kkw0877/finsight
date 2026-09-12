@@ -17,7 +17,6 @@ function harness(overrides: Partial<OncallAlertHarness> = {}): OncallAlertHarnes
     exceptionTimestamp: "2026-09-12T00:00:00.000Z",
     currentBucketValue: null,
     computedBaseline: null,
-    projectUrl: "https://us.posthog.com/project/123",
     deepLink: "https://us.posthog.com/project/123/error_tracking/fingerprint/fp-abc",
     ...overrides,
   };
@@ -46,6 +45,15 @@ describe("dispatchOncallAlert", () => {
     );
     const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
     expect(body).toEqual({ event_type: "posthog-oncall-alert", client_payload: harness() });
+  });
+
+  it("keeps client_payload at or under GitHub's 10-top-level-property limit for repository_dispatch", async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 204 });
+
+    await dispatchOncallAlert(harness());
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    expect(Object.keys(body.client_payload).length).toBeLessThanOrEqual(10);
   });
 
   it("throws when GitHub responds with a non-2xx status", async () => {
