@@ -92,10 +92,14 @@ describe("POST /api/webhooks/posthog-alert/[secret]", () => {
 
   it("dispatch 실패 시 방금 넣은 event_id를 롤백하고 502를 반환한다(재시도 허용)", async () => {
     mockDispatch.mockRejectedValueOnce(new Error("network error"));
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
 
     const response = await POST(buildRequest(issueCreatedBody("evt-route-5")), {
       params: Promise.resolve({ secret: "test-secret-value" }),
     });
+
+    expect(consoleError).toHaveBeenCalledWith("oncall dispatch failed:", "network error");
+    consoleError.mockRestore();
 
     expect(response.status).toBe(502);
 

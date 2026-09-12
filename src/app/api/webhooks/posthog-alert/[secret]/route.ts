@@ -45,9 +45,11 @@ export async function POST(
 
   try {
     await dispatchOncallAlert(harness);
-  } catch {
+  } catch (error) {
     // dispatch 실패는 우리 쪽 문제일 수 있으니, 방금 넣은 row를 되돌려 PostHog의
     // 정상 재시도가 이 event_id를 "이미 처리됨"으로 오판하지 않게 한다.
+    // 에러 메시지(GitHub API 응답)는 시크릿을 담지 않으므로 그대로 로그에 남긴다.
+    console.error("oncall dispatch failed:", error instanceof Error ? error.message : error);
     await supabase.from("oncall_alert_events").delete().eq("eventId", harness.eventId);
     return NextResponse.json({ error: "CI dispatch에 실패했습니다." }, { status: 502 });
   }
